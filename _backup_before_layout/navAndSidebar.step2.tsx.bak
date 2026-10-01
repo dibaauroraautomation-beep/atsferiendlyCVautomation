@@ -4,7 +4,7 @@ import { useState, useEffect, ReactNode } from "react";
 import Link from "next/link";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
-import { getMenuFor } from "./pageConfig";
+import { MENU_ITEMS } from "./pageConfig";
 
 interface pageInfoProps {
   pageInfo: [title: string, titleDescription: string, heighLightLink: string];
@@ -36,15 +36,12 @@ function separatePageData(sourceList: PageItem[]) {
   return { n1, n2 };
 }
 
-// Menu items come from pageConfig.ts and can change depending on the current page.
-// Links are absolute so they work from any URL.
-function menuFor(pageKey: string): PageItem[] {
-  return getMenuFor(pageKey).map((m) => ({ name: m.name, path: `/pages/${m.key}` }));
-}
+// Menu items come from pageConfig.ts; links are absolute so they work from any URL.
+const pathVar: PageItem[] = MENU_ITEMS.map((m) => ({ name: m.name, path: `/pages/${m.key}` }));
 
 function SidebarContent({ highlightLink, onLinkClick }: { highlightLink: string; onLinkClick?: () => void }) {
   const { t } = useLanguage();
-  const { n1: listOfPageNames, n2: listOfPages } = separatePageData(menuFor(highlightLink));
+  const { n1: listOfPageNames, n2: listOfPages } = separatePageData(pathVar);
 
   return (
     <div className="flex flex-col min-h-0">

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
+import NavAndSidebar from "@/app/components/navAndSidebar";
 import FeatureCard from "@/app/components/FeatureCard";
 import { useUser } from "@/app/contexts/UserContext";
 import { useLanguage, useT } from "@/app/contexts/LanguageContext";
@@ -1041,6 +1042,16 @@ export default function Resume_Generator() {
 
   return (
     <div>
+      <NavAndSidebar
+        pageInfo={["Resume Generator", "", "Resume_Generator"]}
+        user={[
+        user.name,
+        user.profilePic,
+        user.notificationNumber,
+        user.purchasePlan,
+        pageWebHookUrl,
+      ]}
+      >
         <div className={s.page}>
           <div className={s.dashboard}>
             <UploadCard file={file} onFileChange={setFile} />
@@ -1051,6 +1062,7 @@ export default function Resume_Generator() {
             <EditedCvCard result={result} />
           </div>
         </div>
+      </NavAndSidebar>
     </div>
   );
 }

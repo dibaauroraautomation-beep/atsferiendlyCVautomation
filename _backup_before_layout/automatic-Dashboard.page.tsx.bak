@@ -303,9 +303,9 @@ export default function AutomaticDashboardPage() {
   /* ---------- Sidebar ---------- */
   const navItems = [
     { label: "Dashboard", href: "/pages/automatic-Dashboard", icon: ICONS.home, active: true },
-    { label: "Jobs", href: "/pages/jobs", icon: ICONS.jobs },
-    { label: "Applications & Reports", href: "/pages/reports", icon: ICONS.report },
-    { label: "Profile", href: "/pages/profile", icon: ICONS.user },
+    { label: "Jobs", href: "#top-jobs", icon: ICONS.jobs },
+    { label: "Applications & Reports", href: "/pages/ApplicationsStatus", icon: ICONS.report },
+    { label: "Profile", href: "/pages/setting", icon: ICONS.user },
   ];
 
   const Sidebar = (

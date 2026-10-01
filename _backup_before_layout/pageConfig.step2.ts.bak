@@ -1,0 +1,64 @@
+// Title + description shown in the top bar. Only pages listed here get the sidebar.
+// Key = the folder name under /pages (e.g. "/pages/Dashboard" -> "Dashboard").
+// To add a new page: create app/pages/<Folder>/page.tsx, add one line here,
+// and (if it should appear in the menu) one line to MENU_ITEMS.
+
+export type PageConfig = {
+  title: string;
+  description: string;
+  // OPTIONAL: which menu items to show in the sidebar while the user is on THIS page.
+  // Use the page keys from MENU_ITEMS. If you leave it out, the full menu is shown.
+  menu?: string[];
+};
+
+export const PAGE_CONFIG: Record<string, PageConfig> = {
+  Dashboard: {
+    title: "Dashboard Overview",
+    description: "Track your daily analytics and user growth in real-time.",
+  },
+  Resume_Generator: {
+    title: "Resume Generator",
+    description: "",
+    // Example of conditional menu (remove the // to turn it on):
+    // When you are on Resume Generator, the menu only shows these pages.
+    // menu: ["Dashboard", "Resume_Generator", "coverLetterGenerator", "ApplicationsStatus"],
+  },
+  coverLetterGenerator: {
+    title: "AI Cover Letter Generator",
+    description: "Create tailored, professional cover letters for any job description in seconds.",
+  },
+  Interview_Prep_AI: { title: "Interview Prep AI", description: "" },
+  ApplicationsStatus: {
+    title: "Applications Status",
+    description: "Track, manage and organize your job applications in one place.",
+  },
+  jobs: { title: "Jobs", description: "" },
+  reports: { title: "Reports", description: "" },
+  profile: { title: "Profile", description: "" },
+  setting: {
+    title: "Account & Preferences",
+    description: "Manage your profile details, security options, and subscription settings.",
+  },
+};
+
+// Sidebar menu, in display order.
+export const MENU_ITEMS: { name: string; key: string }[] = [
+  { name: "Dashboard", key: "Dashboard" },
+  { name: "Resume Generator", key: "Resume_Generator" },
+  { name: "Cover Letter Generator", key: "coverLetterGenerator" },
+  { name: "Interview Prep AI", key: "Interview_Prep_AI" },
+  { name: "Applications Status", key: "ApplicationsStatus" },
+  { name: "Jobs", key: "jobs" },
+  { name: "Reports", key: "reports" },
+  { name: "Profile", key: "profile" },
+  { name: "Settings", key: "setting" },
+];
+
+// Returns the menu items to show for the page the user is currently on.
+// - Page has a "menu" list  -> only those items (in MENU_ITEMS order)
+// - Page has no "menu" list -> the full MENU_ITEMS list
+export function getMenuFor(pageKey: string) {
+  const allowed = PAGE_CONFIG[pageKey]?.menu;
+  if (!allowed) return MENU_ITEMS;
+  return MENU_ITEMS.filter((item) => allowed.includes(item.key));
+}

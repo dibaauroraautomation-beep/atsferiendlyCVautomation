@@ -1,5 +1,19 @@
 "use client";
 
+import FeatureCard from "@/app/components/FeatureCard";
+import NavAndSidebar from "@/app/components/navAndSidebar";
+import Card from "@/app/components/Card";
+
+import {  useT } from "@/app/contexts/LanguageContext";
+import { useUser } from "@/app/contexts/UserContext";
+import { useJobDescription } from "@/app/contexts/JobDescriptionContext";
+import { useGoogleDrivePicker } from "@/app/hooks/useGoogleDrivePicker";
+
+
+// import { useState,useRef, useEffect} from "react";
+import { generateCoverLetterPDF } from "@/app/components/jsPDF";
+import { generateCoverLetterDocx } from "@/app/components/DocxGenerator";
+
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState } from "react";
@@ -303,9 +317,9 @@ export default function AutomaticDashboardPage() {
   /* ---------- Sidebar ---------- */
   const navItems = [
     { label: "Dashboard", href: "/pages/automatic-Dashboard", icon: ICONS.home, active: true },
-    { label: "Jobs", href: "/pages/jobs", icon: ICONS.jobs },
-    { label: "Applications & Reports", href: "/pages/reports", icon: ICONS.report },
-    { label: "Profile", href: "/pages/profile", icon: ICONS.user },
+    { label: "Jobs", href: "#top-jobs", icon: ICONS.jobs },
+    { label: "Applications & Reports", href: "/pages/ApplicationsStatus", icon: ICONS.report },
+    { label: "Profile", href: "/pages/setting", icon: ICONS.user },
   ];
 
   const Sidebar = (
@@ -356,6 +370,20 @@ export default function AutomaticDashboardPage() {
   }
 
   return (
+    <>
+    <NavAndSidebar
+          pageInfo={[
+            "AI Cover Letter Generator",
+            "Create tailored, professional cover letters for any job description in seconds.",
+            "coverLetterGenerator",
+          ]}
+          user={[
+        "user.name",
+        "user.profilePic",
+        0,
+        "user.purchasePlan",
+        "pageWebHookUrl",
+      ]}/>
     <div className="min-h-screen bg-slate-100 flex">
       {/* Desktop sidebar */}
       <div className="hidden lg:block fixed inset-y-0 left-0">{Sidebar}</div>
@@ -522,5 +550,6 @@ export default function AutomaticDashboardPage() {
         </main>
       </div>
     </div>
+    </>
   );
 }

@@ -1,0 +1,365 @@
+"use client";
+
+/*
+  Job Matches page  (/pages/jobs)
+  The page title + description come from pageConfig.ts (shared layout).
+
+  Data: Supabase table "user_documents", rows with type = "job" (RLS returns only this user's rows).
+  Your n8n workflow should insert each found job like this:
+    content: {
+      title, company, location,          // text
+      work_type,                          // "Remote" | "On-site" | "Hybrid"
+      experience,                         // e.g. "Junior", "Mid", "Senior"
+      match_score,                        // 0-100
+      url,                                // job posting / apply link
+      cv_url, cover_letter_url,           // generated documents (optional)
+      posted_at,                          // ISO date (optional, falls back to created_at)
+      source                              // "automatic" | "manual" (optional, default automatic)
+    }
+*/
+
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/app/contexts/AuthContext";
+import { useT } from "@/app/contexts/LanguageContext";
+
+/* ------------------------------------------------------------------ */
+/* Types & helpers                                                     */
+/* ------------------------------------------------------------------ */
+type JobContent = {
+  title?: string;
+  company?: string;
+  location?: string;
+  work_type?: string;
+  experience?: string;
+  match_score?: number | string;
+  url?: string;
+  cv_url?: string;
+  cover_letter_url?: string;
+  posted_at?: string;
+  source?: string;
+};
+
+type JobRow = { id: string; created_at: string; content: JobContent };
+
+// A job counts as a "strong match" at or above this score.
+const STRONG_MATCH = 85;
+
+const score = (j: JobRow) => Number(j.content?.match_score ?? 0) || 0;
+const postedDate = (j: JobRow) => new Date(j.content?.posted_at || j.created_at);
+
+function timeAgo(date: Date) {
+  const mins = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (mins < 60) return `${Math.max(mins, 1)}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function scoreColor(s: number) {
+  if (s >= 85) return "text-emerald-600";
+  if (s >= 70) return "text-amber-600";
+  return "text-slate-500";
+}
+
+const unique = (values: (string | undefined)[]) =>
+  Array.from(new Set(values.filter((v): v is string => !!v && v.trim() !== ""))).sort();
+
+const POSTED_OPTIONS = [
+  { label: "Last 24 hours", hours: 24 },
+  { label: "Last 7 days", hours: 24 * 7 },
+  { label: "Last 30 days", hours: 24 * 30 },
+  { label: "Any time", hours: 0 },
+];
+
+const SCORE_OPTIONS = [
+  { label: "Any Match Score", min: 0 },
+  { label: "90%+", min: 90 },
+  { label: "80%+", min: 80 },
+  { label: "70%+", min: 70 },
+];
+
+/* ------------------------------------------------------------------ */
+/* Small UI pieces                                                     */
+/* ------------------------------------------------------------------ */
+function FilterSelect({
+  value,
+  onChange,
+  placeholder,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+    >
+      {placeholder !== undefined && <option value="">{placeholder}</option>}
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function ViewLink({ href, label }: { href?: string; label: string }) {
+  if (!href) return <span className="text-slate-300">—</span>;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+      {label}
+    </a>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
+export default function JobMatchesPage() {
+  const supabase = createClient();
+  const { user, loading: authLoading } = useAuth();
+  const t = useT();
+
+  const [jobs, setJobs] = useState<JobRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Filters
+  const [search, setSearch] = useState("");
+  const [title, setTitle] = useState("");
+  const [location, setLocation] = useState("");
+  const [workType, setWorkType] = useState("");
+  const [experience, setExperience] = useState("");
+  const [minScore, setMinScore] = useState("0");
+  const [postedHours, setPostedHours] = useState("24");
+  const [automatic, setAutomatic] = useState(true);
+
+  /* ---------- Load jobs ---------- */
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      setLoading(true);
+      setError("");
+      const { data, error } = await supabase
+        .from("user_documents")
+        .select("id, created_at, content")
+        .eq("type", "job")
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.error(error);
+        setError(t("Could not load your jobs. Refresh the page to try again."));
+      }
+      setJobs((data ?? []) as JobRow[]);
+      setLoading(false);
+    };
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  /* ---------- Dropdown options from the data ---------- */
+  const titleOptions = useMemo(() => unique(jobs.map((j) => j.content?.title)), [jobs]);
+  const locationOptions = useMemo(() => unique(jobs.map((j) => j.content?.location)), [jobs]);
+  const workTypeOptions = useMemo(
+    () => unique(["Remote", "On-site", "Hybrid", ...jobs.map((j) => j.content?.work_type)]),
+    [jobs]
+  );
+  const experienceOptions = useMemo(() => unique(jobs.map((j) => j.content?.experience)), [jobs]);
+
+  /* ---------- Header counts ---------- */
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const foundToday = jobs.filter((j) => new Date(j.created_at) >= today);
+  const strongToday = foundToday.filter((j) => score(j) >= STRONG_MATCH);
+
+  /* ---------- Apply filters ---------- */
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const hours = Number(postedHours);
+    const min = Number(minScore);
+
+    return jobs.filter((j) => {
+      const c = j.content ?? {};
+      const source = (c.source || "automatic").toLowerCase();
+      if (automatic && source !== "automatic") return false;
+      if (!automatic && !q) return false; // manual mode: only show results after a search
+      if (q) {
+        const text = [c.title, c.company, c.location, c.experience].join(" ").toLowerCase();
+        if (!text.includes(q)) return false;
+      }
+      if (title && c.title !== title) return false;
+      if (location && c.location !== location) return false;
+      if (workType && (c.work_type || "").toLowerCase() !== workType.toLowerCase()) return false;
+      if (experience && c.experience !== experience) return false;
+      if (score(j) < min) return false;
+      if (hours > 0 && Date.now() - postedDate(j).getTime() > hours * 3600000) return false;
+      return true;
+    });
+  }, [jobs, search, title, location, workType, experience, minScore, postedHours, automatic]);
+
+  /* ---------- Render ---------- */
+  if (authLoading) {
+    return <div className="py-20 text-center text-sm text-slate-500">{t("Loading...")}</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Search */}
+      <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5">
+        <span className="text-sm font-medium text-slate-600 shrink-0">{t("Search Jobs")}</span>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t("Search by keywords, skills...")}
+          className="flex-1 min-w-0 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
+        />
+      </div>
+
+      {/* Filters */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        <FilterSelect
+          value={title}
+          onChange={setTitle}
+          placeholder={t("Job Title")}
+          options={titleOptions.map((v) => ({ value: v, label: v }))}
+        />
+        <FilterSelect
+          value={location}
+          onChange={setLocation}
+          placeholder={t("Location")}
+          options={locationOptions.map((v) => ({ value: v, label: v }))}
+        />
+        <FilterSelect
+          value={workType}
+          onChange={setWorkType}
+          placeholder={t("Remote/On-site")}
+          options={workTypeOptions.map((v) => ({ value: v, label: t(v) }))}
+        />
+        <FilterSelect
+          value={experience}
+          onChange={setExperience}
+          placeholder={t("Experience")}
+          options={experienceOptions.map((v) => ({ value: v, label: v }))}
+        />
+        <FilterSelect
+          value={minScore}
+          onChange={setMinScore}
+          options={SCORE_OPTIONS.map((o) => ({ value: String(o.min), label: t(o.label) }))}
+        />
+        <FilterSelect
+          value={postedHours}
+          onChange={setPostedHours}
+          options={POSTED_OPTIONS.map((o) => ({ value: String(o.hours), label: t(o.label) }))}
+        />
+      </div>
+
+      {/* Automatic / Manual toggle */}
+      <div className="flex items-center gap-3 text-sm">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={automatic}
+          onClick={() => setAutomatic((a) => !a)}
+          className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${
+            automatic ? "bg-indigo-600" : "bg-slate-300"
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 rounded-full bg-white shadow transition ${
+              automatic ? "translate-x-4" : "translate-x-0.5"
+            }`}
+          />
+        </button>
+        <span className={automatic ? "font-medium text-slate-800" : "text-slate-500"}>{t("Automatic Matches")}</span>
+        <span className="text-slate-300">|</span>
+        <span className={!automatic ? "font-medium text-slate-800" : "text-slate-500"}>{t("Manual Search")}</span>
+      </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>
+      )}
+
+      {/* Results table */}
+      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+        <div className="px-4 py-3 text-sm text-slate-700 border-b border-slate-100">
+          {foundToday.length} {t("jobs found today")} • {strongToday.length} {t("strong matches")}
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-slate-500 border-b border-slate-100">
+                <th className="px-4 py-2.5 font-medium">{t("Job Title")}</th>
+                <th className="px-4 py-2.5 font-medium">{t("Company")}</th>
+                <th className="px-4 py-2.5 font-medium">{t("Location")}</th>
+                <th className="px-4 py-2.5 font-medium">{t("Match Score")}</th>
+                <th className="px-4 py-2.5 font-medium">{t("Posted")}</th>
+                <th className="px-4 py-2.5 font-medium">{t("CV")}</th>
+                <th className="px-4 py-2.5 font-medium">{t("Cover Letter")}</th>
+                <th className="px-4 py-2.5 font-medium">{t("Apply")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
+                    {t("Loading...")}
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
+                    {!automatic && !search.trim()
+                      ? t("Type a keyword above to search jobs manually.")
+                      : t("No jobs match your filters.")}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((j) => {
+                  const c = j.content ?? {};
+                  const s = score(j);
+                  return (
+                    <tr key={j.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                      <td className="px-4 py-3 font-semibold text-slate-800">{c.title || "—"}</td>
+                      <td className="px-4 py-3 text-slate-600">{c.company || "—"}</td>
+                      <td className="px-4 py-3 text-slate-600">{c.location || c.work_type || "—"}</td>
+                      <td className={`px-4 py-3 font-medium ${scoreColor(s)}`}>{s}%</td>
+                      <td className="px-4 py-3 text-slate-600">{timeAgo(postedDate(j))}</td>
+                      <td className="px-4 py-3">
+                        <ViewLink href={c.cv_url} label={t("View")} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <ViewLink href={c.cover_letter_url} label={t("View")} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {c.url ? (
+                          <a
+                            href={c.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block rounded-md bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                          >
+                            {t("Apply")}
+                          </a>
+                        ) : (
+                          <span className="inline-block rounded-md bg-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-400">
+                            {t("Apply")}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}

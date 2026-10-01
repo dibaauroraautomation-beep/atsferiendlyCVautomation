@@ -1,0 +1,100 @@
+// Title + description shown in the top bar. Only pages listed here get the sidebar.
+// Key = the folder name under /pages (e.g. "/pages/Dashboard" -> "Dashboard").
+// To add a new page: create app/pages/<Folder>/page.tsx, add it to PAGE_CONFIG,
+// add it to MENU_ITEMS, and add its key to MANUAL_MENU and/or AUTOMATED_MENU.
+
+export type PageConfig = {
+  title: string;
+  description: string;
+  // OPTIONAL: which menu items to show in the sidebar while the user is on THIS page.
+  // Use the page keys from MENU_ITEMS. If you leave it out, the full menu is shown.
+  menu?: string[];
+};
+
+// ---------------------------------------------------------------------------
+// Menu groups
+// ---------------------------------------------------------------------------
+
+// Shown on both groups
+const SHARED = ["Dashboard","profile", "setting"];
+
+// Manual-user pages: on any of these pages, the menu shows only this group
+export const MANUAL_MENU = [
+  "Resume_Generator",
+  "coverLetterGenerator",
+  "Interview_Prep_AI",
+  "ApplicationsStatus",
+  ...SHARED,
+];
+
+// Automated-user pages: on any of these pages, the menu shows only this group
+export const AUTOMATED_MENU = ["jobs", "reports", ...SHARED];
+
+// ---------------------------------------------------------------------------
+// Pages
+// ---------------------------------------------------------------------------
+
+export const PAGE_CONFIG: Record<string, PageConfig> = {
+  // ----- Manual pages -----
+  Resume_Generator: {
+    title: "Resume Generator",
+    description: "Upload your CV and a job description to get an ATS score, skill-gap analysis and an optimized resume.",
+    menu: MANUAL_MENU,
+  },
+  coverLetterGenerator: {
+    title: "AI Cover Letter Generator",
+    description: "Create tailored, professional cover letters for any job description in seconds.",
+    menu: MANUAL_MENU,
+  },
+  Interview_Prep_AI: {
+    title: "Interview Prep AI",
+    description: "Get a personalized interview preparation guide with technical, behavioral and HR questions.",
+    menu: MANUAL_MENU,
+  },
+  ApplicationsStatus: {
+    title: "Applications Status",
+    description: "Track, manage and organize your job applications in one place.",
+    menu: MANUAL_MENU,
+  },
+
+  // ----- Automated pages -----
+  jobs: {
+    title: "Jobs",
+    description: "See the jobs found by your automated job search and track its progress.",
+    menu: AUTOMATED_MENU,
+  },
+  reports: {
+    title: "Reports",
+    description: "Review reports and insights about your job search and applications.",
+    menu: AUTOMATED_MENU,
+  },
+
+  // ----- Shared pages (no "menu" -> full menu, since they belong to both groups) -----
+   Dashboard: {
+    title: "Dashboard Overview",
+    description: "Track your daily analytics and user growth in real-time.",
+  },
+  profile: { title: "Profile", description: "View and update your personal information and CV details." },
+  
+};
+
+// Sidebar menu: every possible item, in display order.
+export const MENU_ITEMS: { name: string; key: string }[] = [
+  { name: "Dashboard", key: "Dashboard" },
+  { name: "Resume Generator", key: "Resume_Generator" },
+  { name: "Cover Letter Generator", key: "coverLetterGenerator" },
+  { name: "Interview Prep AI", key: "Interview_Prep_AI" },
+  { name: "Applications Status", key: "ApplicationsStatus" },
+  { name: "Jobs", key: "jobs" },
+  { name: "Reports", key: "reports" },
+  { name: "Profile", key: "profile" },
+];
+
+// Returns the menu items to show for the page the user is currently on.
+// - Page has a "menu" list  -> only those items (in MENU_ITEMS order)
+// - Page has no "menu" list -> the full MENU_ITEMS list
+export function getMenuFor(pageKey: string) {
+  const allowed = PAGE_CONFIG[pageKey]?.menu;
+  if (!allowed) return MENU_ITEMS;
+  return MENU_ITEMS.filter((item) => allowed.includes(item.key));
+}

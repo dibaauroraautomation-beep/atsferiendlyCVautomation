@@ -1,5 +1,18 @@
 "use client";
 
+import FeatureCard from "@/app/components/FeatureCard";
+import Card from "@/app/components/Card";
+
+import {  useT } from "@/app/contexts/LanguageContext";
+import { useUser } from "@/app/contexts/UserContext";
+import { useJobDescription } from "@/app/contexts/JobDescriptionContext";
+import { useGoogleDrivePicker } from "@/app/hooks/useGoogleDrivePicker";
+
+
+// import { useState,useRef, useEffect} from "react";
+import { generateCoverLetterPDF } from "@/app/components/jsPDF";
+import { generateCoverLetterDocx } from "@/app/components/DocxGenerator";
+
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState } from "react";
@@ -303,9 +316,9 @@ export default function AutomaticDashboardPage() {
   /* ---------- Sidebar ---------- */
   const navItems = [
     { label: "Dashboard", href: "/pages/automatic-Dashboard", icon: ICONS.home, active: true },
-    { label: "Jobs", href: "/pages/jobs", icon: ICONS.jobs },
-    { label: "Applications & Reports", href: "/pages/reports", icon: ICONS.report },
-    { label: "Profile", href: "/pages/profile", icon: ICONS.user },
+    { label: "Jobs", href: "#top-jobs", icon: ICONS.jobs },
+    { label: "Applications & Reports", href: "/pages/ApplicationsStatus", icon: ICONS.report },
+    { label: "Profile", href: "/pages/setting", icon: ICONS.user },
   ];
 
   const Sidebar = (
@@ -349,178 +362,139 @@ export default function AutomaticDashboardPage() {
   /* ---------- Render ---------- */
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100 text-sm text-slate-500">
+      <div className="py-20 flex items-center justify-center text-sm text-slate-500">
         Loading your dashboard...
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-slate-100 flex">
-      {/* Desktop sidebar */}
-      <div className="hidden lg:block fixed inset-y-0 left-0">{Sidebar}</div>
+  return (<></>
+    // <div className="pb-10 space-y-5">
+    //       <div>
+    //         <h1 className="text-2xl font-bold text-slate-900">Welcome back, {firstName}</h1>
+    //         <p className="text-sm text-slate-500 mt-1">
+    //           {automationActive
+    //             ? "Your automated job search is running."
+    //             : "Your automated job search will start once your CV is processed."}
+    //         </p>
+    //       </div>
 
-      {/* Mobile sidebar */}
-      {menuOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 flex">
-          <div className="h-full">{Sidebar}</div>
-          <button
-            aria-label="Close menu"
-            onClick={() => setMenuOpen(false)}
-            className="flex-1 bg-black/40"
-          />
-        </div>
-      )}
+    //       {error && (
+    //         <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{error}</div>
+    //       )}
 
-      <div className="flex-1 lg:ml-64 min-w-0">
-        {/* Top bar */}
-        <header className="h-16 flex items-center justify-between px-4 sm:px-6">
-          <button
-            aria-label="Open menu"
-            onClick={() => setMenuOpen(true)}
-            className="lg:hidden text-slate-600"
-          >
-            <Icon d={ICONS.menu} className="w-6 h-6" />
-          </button>
-          <div className="flex items-center gap-4 ml-auto">
-            <button aria-label="Notifications" className="text-slate-500 hover:text-slate-700">
-              <Icon d={ICONS.bell} className="w-6 h-6" />
-            </button>
-            <div className="flex items-center gap-2">
-              <Avatar name={fullName} src={avatarUrl} />
-              <span className="text-sm font-medium text-slate-800 max-w-[160px] truncate">{fullName}</span>
-            </div>
-          </div>
-        </header>
+    //       {/* Stats */}
+    //       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+    //         <StatCard label="Jobs Found Today" value={loading ? "–" : stats.jobsToday} icon={ICONS.search} />
+    //         <StatCard label="Matching Jobs" value={loading ? "–" : stats.matchingJobs} icon={ICONS.target} />
+    //         <StatCard label="CVs Generated" value={loading ? "–" : stats.cvsGenerated} icon={ICONS.doc} />
+    //         <StatCard label="Applications This Week" value={loading ? "–" : stats.applicationsThisWeek} icon={ICONS.send} />
+    //       </div>
 
-        <main className="px-4 sm:px-6 pb-10 space-y-5">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Welcome back, {firstName}</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              {automationActive
-                ? "Your automated job search is running."
-                : "Your automated job search will start once your CV is processed."}
-            </p>
-          </div>
+    //       {/* Chart */}
+    //       <section className="bg-white rounded-xl border border-slate-200 p-5">
+    //         <h2 className="text-sm font-semibold text-slate-900 mb-4">Job Search Activity</h2>
+    //         <ActivityChart labels={chart.labels} values={chart.values} />
+    //       </section>
 
-          {error && (
-            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{error}</div>
-          )}
+    //       {/* Table + status */}
+    //       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+    //         <section id="top-jobs" className="xl:col-span-2 bg-white rounded-xl border border-slate-200">
+    //           <h2 className="text-sm font-semibold text-slate-900 px-5 py-4 border-b border-slate-100">
+    //             Top Matching Jobs
+    //           </h2>
+    //           <div className="overflow-x-auto">
+    //             <table className="w-full text-sm">
+    //               <thead>
+    //                 <tr className="bg-slate-50 text-left text-slate-600">
+    //                   <th className="px-5 py-2.5 font-medium">Job Title</th>
+    //                   <th className="px-3 py-2.5 font-medium">Company</th>
+    //                   <th className="px-3 py-2.5 font-medium">Location</th>
+    //                   <th className="px-3 py-2.5 font-medium">Match Score</th>
+    //                   <th className="px-3 py-2.5 font-medium">Date</th>
+    //                   <th className="px-5 py-2.5 font-medium">Action</th>
+    //                 </tr>
+    //               </thead>
+    //               <tbody>
+    //                 {loading ? (
+    //                   <tr>
+    //                     <td colSpan={6} className="px-5 py-8 text-center text-slate-400">Loading jobs...</td>
+    //                   </tr>
+    //                 ) : topJobs.length === 0 ? (
+    //                   <tr>
+    //                     <td colSpan={6} className="px-5 py-8 text-center text-slate-500">
+    //                       No jobs found yet. New matches will appear here after the next automated search.
+    //                     </td>
+    //                   </tr>
+    //                 ) : (
+    //                   topJobs.map((job) => {
+    //                     const s = score(job);
+    //                     return (
+    //                       <tr key={job.id} className="border-t border-slate-100">
+    //                         <td className="px-5 py-3 font-medium text-slate-900 whitespace-nowrap">
+    //                           {job.content.title || "Untitled role"}
+    //                         </td>
+    //                         <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{job.content.company || "—"}</td>
+    //                         <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{job.content.location || "—"}</td>
+    //                         <td
+    //                           className={`px-3 py-3 font-medium ${
+    //                             s >= 85 ? "text-emerald-600" : s >= MATCH_THRESHOLD ? "text-amber-600" : "text-slate-500"
+    //                           }`}
+    //                         >
+    //                           {s}%
+    //                         </td>
+    //                         <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{formatDate(job.created_at)}</td>
+    //                         <td className="px-5 py-3">
+    //                           {job.content.url ? (
+    //                             <a
+    //                               href={job.content.url}
+    //                               target="_blank"
+    //                               rel="noopener noreferrer"
+    //                               className="inline-block px-3 py-1.5 text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 rounded-md whitespace-nowrap"
+    //                             >
+    //                               View Details
+    //                             </a>
+    //                           ) : (
+    //                             <span className="text-xs text-slate-400">No link</span>
+    //                           )}
+    //                         </td>
+    //                       </tr>
+    //                     );
+    //                   })
+    //                 )}
+    //               </tbody>
+    //             </table>
+    //           </div>
+    //         </section>
 
-          {/* Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <StatCard label="Jobs Found Today" value={loading ? "–" : stats.jobsToday} icon={ICONS.search} />
-            <StatCard label="Matching Jobs" value={loading ? "–" : stats.matchingJobs} icon={ICONS.target} />
-            <StatCard label="CVs Generated" value={loading ? "–" : stats.cvsGenerated} icon={ICONS.doc} />
-            <StatCard label="Applications This Week" value={loading ? "–" : stats.applicationsThisWeek} icon={ICONS.send} />
-          </div>
-
-          {/* Chart */}
-          <section className="bg-white rounded-xl border border-slate-200 p-5">
-            <h2 className="text-sm font-semibold text-slate-900 mb-4">Job Search Activity</h2>
-            <ActivityChart labels={chart.labels} values={chart.values} />
-          </section>
-
-          {/* Table + status */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-            <section id="top-jobs" className="xl:col-span-2 bg-white rounded-xl border border-slate-200">
-              <h2 className="text-sm font-semibold text-slate-900 px-5 py-4 border-b border-slate-100">
-                Top Matching Jobs
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 text-left text-slate-600">
-                      <th className="px-5 py-2.5 font-medium">Job Title</th>
-                      <th className="px-3 py-2.5 font-medium">Company</th>
-                      <th className="px-3 py-2.5 font-medium">Location</th>
-                      <th className="px-3 py-2.5 font-medium">Match Score</th>
-                      <th className="px-3 py-2.5 font-medium">Date</th>
-                      <th className="px-5 py-2.5 font-medium">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <tr>
-                        <td colSpan={6} className="px-5 py-8 text-center text-slate-400">Loading jobs...</td>
-                      </tr>
-                    ) : topJobs.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-5 py-8 text-center text-slate-500">
-                          No jobs found yet. New matches will appear here after the next automated search.
-                        </td>
-                      </tr>
-                    ) : (
-                      topJobs.map((job) => {
-                        const s = score(job);
-                        return (
-                          <tr key={job.id} className="border-t border-slate-100">
-                            <td className="px-5 py-3 font-medium text-slate-900 whitespace-nowrap">
-                              {job.content.title || "Untitled role"}
-                            </td>
-                            <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{job.content.company || "—"}</td>
-                            <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{job.content.location || "—"}</td>
-                            <td
-                              className={`px-3 py-3 font-medium ${
-                                s >= 85 ? "text-emerald-600" : s >= MATCH_THRESHOLD ? "text-amber-600" : "text-slate-500"
-                              }`}
-                            >
-                              {s}%
-                            </td>
-                            <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{formatDate(job.created_at)}</td>
-                            <td className="px-5 py-3">
-                              {job.content.url ? (
-                                <a
-                                  href={job.content.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-block px-3 py-1.5 text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 rounded-md whitespace-nowrap"
-                                >
-                                  View Details
-                                </a>
-                              ) : (
-                                <span className="text-xs text-slate-400">No link</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            <section className="bg-white rounded-xl border border-slate-200 h-fit">
-              <h2 className="text-sm font-semibold text-slate-900 px-5 py-4 border-b border-slate-100">
-                Automation Status
-              </h2>
-              <div className="p-5 space-y-3">
-                <div
-                  className={`flex items-center gap-3 p-3 rounded-lg ${
-                    automationActive ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"
-                  }`}
-                >
-                  <span
-                    className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-white ${
-                      automationActive ? "bg-emerald-500" : "bg-amber-500"
-                    }`}
-                  >
-                    <Icon d="m4.5 12.75 6 6 9-13.5" className="w-4 h-4" />
-                  </span>
-                  <span className="text-sm font-medium">
-                    {automationActive ? "Automated Job Search Active" : "Waiting for CV analysis"}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600">
-                  Last search: {lastSearch ? formatDateTime(lastSearch) : "No searches yet"}
-                </p>
-                <p className="text-xs text-slate-600">Schedule: {AUTOMATION_SCHEDULE}</p>
-              </div>
-            </section>
-          </div>
-        </main>
-      </div>
-    </div>
+    //         <section className="bg-white rounded-xl border border-slate-200 h-fit">
+    //           <h2 className="text-sm font-semibold text-slate-900 px-5 py-4 border-b border-slate-100">
+    //             Automation Status
+    //           </h2>
+    //           <div className="p-5 space-y-3">
+    //             <div
+    //               className={`flex items-center gap-3 p-3 rounded-lg ${
+    //                 automationActive ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"
+    //               }`}
+    //             >
+    //               <span
+    //                 className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-white ${
+    //                   automationActive ? "bg-emerald-500" : "bg-amber-500"
+    //                 }`}
+    //               >
+    //                 <Icon d="m4.5 12.75 6 6 9-13.5" className="w-4 h-4" />
+    //               </span>
+    //               <span className="text-sm font-medium">
+    //                 {automationActive ? "Automated Job Search Active" : "Waiting for CV analysis"}
+    //               </span>
+    //             </div>
+    //             <p className="text-xs text-slate-600">
+    //               Last search: {lastSearch ? formatDateTime(lastSearch) : "No searches yet"}
+    //             </p>
+    //             <p className="text-xs text-slate-600">Schedule: {AUTOMATION_SCHEDULE}</p>
+    //           </div>
+    //         </section>
+    //       </div>
+    // </div>
   );
 }
