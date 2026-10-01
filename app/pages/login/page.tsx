@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 // Login + registration now go through Supabase.
 // n8n is only used to ANALYZE the CV in automated registration.
 const WEBHOOK_BASE = "https://n8naurora.duckdns.org/webhook";
-const AUTO_REGISTER_URL = `${WEBHOOK_BASE}/register-automated`;
+const AUTO_REGISTER_URL = `${WEBHOOK_BASE}/info-extract`;
 
 const CV_BUCKET = "cvs";
 
@@ -386,6 +386,7 @@ export default function LoginPage() {
       formData.append("first name", first || "");
       formData.append("last name", rest.join(" "));
       formData.append("email", email);
+      formData.append("password", autoPassword);
       formData.append("language", autoLanguage);
       formData.append("registration type", "automated");
       formData.append("cv path", cvPath);
