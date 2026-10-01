@@ -1,6 +1,5 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
-import NavAndSidebar from "@/app/components/navAndSidebar";
 import FeatureCard from "@/app/components/FeatureCard";
 import globeImg from "./globe.png";
 import { useT } from "@/app/contexts/LanguageContext";
@@ -301,16 +300,6 @@ export default function Interview_Prep_AI() {
 
   return (
     <div>
-      <NavAndSidebar
-        pageInfo={[t("Interview Prep AI"), "", "Interview_Prep_AI"]}
-        user={[
-        user.name,
-        user.profilePic,
-        user.notificationNumber,
-        user.purchasePlan,
-        pageWebHookUrl
-      ]}
-      >
         <div className="max-w-[1120px] mx-auto space-y-6">
           <input
             ref={fileRef}
@@ -341,7 +330,6 @@ export default function Interview_Prep_AI() {
           {topRow3StepCards()}
           {(status !== 'idle' || result) && interviewResults()}
         </div>
-      </NavAndSidebar>
     </div>
   );
 

@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import NavAndSidebar from "@/app/components/navAndSidebar";
 import GoogleSheetReader from "@/app/components/GoogleSheetReader";
 import InteractiveBadge from "@/app/components/IneractiveBadge";
 import { useState, useCallback } from "react";
@@ -92,20 +91,6 @@ export default function ApplicationsStatus() {
 
   return (
     <div>
-      <NavAndSidebar
-        pageInfo={[
-          "Applications Status",
-          "Track, manage and organize your job applications in one place.",
-          "ApplicationsStatus",
-        ]}
-user={[
-          user.name,
-          user.profilePic,
-          user.notificationNumber,
-          user.purchasePlan,
-          user.WebHook_Url["ApplicationsStatus"],
-        ]}
-      >
         <div className="w-full">
           <Card>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 items-stretch p-4 w-full">
@@ -286,7 +271,6 @@ user={[
             </div>
           </div>
         </Card>
-      </NavAndSidebar>
       
       <GoogleSheetReader userId={user.id} debug={false} onDataLoaded={handleDataLoaded} />
     </div>

@@ -3,6 +3,8 @@
 import { useState, useEffect, ReactNode } from "react";
 import Link from "next/link";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useAuth } from "../contexts/AuthContext";
+import { getMenuFor } from "./pageConfig";
 
 interface pageInfoProps {
   pageInfo: [title: string, titleDescription: string, heighLightLink: string];
@@ -34,18 +36,15 @@ function separatePageData(sourceList: PageItem[]) {
   return { n1, n2 };
 }
 
-const pathVar: PageItem[] = [
-  { name: "Dashboard", path: "Dashboard" },
-  { name: "Resume Generator", path: "Resume_Generator" },
-  { name: "Cover Letter Generator", path: "coverLetterGenerator" },
-  { name: "Interview Prep AI", path: "Interview_Prep_AI" },
-  { name: "Applications Status", path: "ApplicationsStatus" },
-  { name: "Settings", path: "setting" },
-];
+// Menu items come from pageConfig.ts and can change depending on the current page.
+// Links are absolute so they work from any URL.
+function menuFor(pageKey: string): PageItem[] {
+  return getMenuFor(pageKey).map((m) => ({ name: m.name, path: `/pages/${m.key}` }));
+}
 
 function SidebarContent({ highlightLink, onLinkClick }: { highlightLink: string; onLinkClick?: () => void }) {
   const { t } = useLanguage();
-  const { n1: listOfPageNames, n2: listOfPages } = separatePageData(pathVar);
+  const { n1: listOfPageNames, n2: listOfPages } = separatePageData(menuFor(highlightLink));
 
   return (
     <div className="flex flex-col min-h-0">
@@ -62,7 +61,7 @@ function SidebarContent({ highlightLink, onLinkClick }: { highlightLink: string;
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {listOfPages.map((pagePath, index) => {
-          if (highlightLink === pagePath) {
+          if (pagePath === `/pages/${highlightLink}`) {
             return (
               <Link
                 key={index}
@@ -104,13 +103,14 @@ function LanguageSelect() {
   );
 }
 
-export default function navAndSidebar({ pageInfo, user, sidebarHeight = "h-screen", children }: pageInfoProps) {
+export default function NavAndSidebar({ pageInfo, user, sidebarHeight = "h-screen", children }: pageInfoProps) {
   const [title, titleDescription, highlightLink] = pageInfo;
   const [name, profilePicLink, notificationNumber, purchasePlan] = user;
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const { t } = useLanguage();
+  const { signOut } = useAuth();
 
   useEffect(() => {
     setUserEmail(localStorage.getItem("userEmail"));
@@ -118,7 +118,8 @@ export default function navAndSidebar({ pageInfo, user, sidebarHeight = "h-scree
 
   const displayName = userEmail || name;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut(); // end the Supabase session so middleware treats you as logged out
     localStorage.removeItem("userEmail");
     window.location.href = "/";
   };

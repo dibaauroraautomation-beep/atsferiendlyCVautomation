@@ -1,6 +1,5 @@
 "use client";
 import FeatureCard from "@/app/components/FeatureCard";
-import NavAndSidebar from "@/app/components/navAndSidebar";
 import Card from "@/app/components/Card";
 
 import {  useT } from "@/app/contexts/LanguageContext";
@@ -184,21 +183,6 @@ export default function CoverLetterGenerator() {
   };
 
   return (
-    <NavAndSidebar
-      pageInfo={[
-        "AI Cover Letter Generator",
-        "Create tailored, professional cover letters for any job description in seconds.",
-        "coverLetterGenerator",
-      ]}
-user={[
-        user.name,
-        user.profilePic,
-        user.notificationNumber,
-        user.purchasePlan,
-        pageWebHookUrl,
-      ]}
-      sidebarHeight="h-screen"
-    >
       <div className="max-w-[1120px] mx-auto space-y-6">
         <input
           type="file"
@@ -353,6 +337,5 @@ user={[
           </Card>
         </div>
       </div>
-    </NavAndSidebar>
   );
 }

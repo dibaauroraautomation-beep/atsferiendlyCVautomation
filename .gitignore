@@ -8,3 +8,4 @@ node_modules/
 .vercel
 .env*
 .env.local
+_backup_before_layout/
