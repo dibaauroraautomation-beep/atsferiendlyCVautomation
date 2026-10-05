@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, ReactNode } from "react";
+import { useState, ReactNode } from "react";
 import Link from "next/link";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -107,20 +107,34 @@ export default function NavAndSidebar({ pageInfo, user, sidebarHeight = "h-scree
   const [title, titleDescription, highlightLink] = pageInfo;
   const [name, profilePicLink, notificationNumber, purchasePlan] = user;
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
   const { t } = useLanguage();
-  const { signOut } = useAuth();
+  const { signOut, user: authUser, profile } = useAuth();
 
-  useEffect(() => {
-    setUserEmail(localStorage.getItem("userEmail"));
-  }, []);
+  // Always show the name given at registration (from Supabase), never the email.
+  const profileName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim();
+  const metaName = [authUser?.user_metadata?.first_name, authUser?.user_metadata?.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  const displayName = profileName || metaName || (name && !name.includes("@") ? name : "") || "User";
+  const initials =
+    displayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0].toUpperCase())
+      .join("") || "U";
 
-  const displayName = userEmail || name;
+  // Photo: the user's own avatar if they have one, otherwise initials
+  const avatarSrc: string = authUser?.user_metadata?.avatar_url || "";
+  const showPhoto = !!avatarSrc && !imgFailed;
+  void profilePicLink; // old static picture from the page props is no longer used
 
   const handleLogout = async () => {
     await signOut(); // end the Supabase session so middleware treats you as logged out
-    localStorage.removeItem("userEmail");
+    localStorage.removeItem("userEmail"); // clean up the old key from the n8n login
     window.location.href = "/";
   };
 
@@ -173,10 +187,31 @@ export default function NavAndSidebar({ pageInfo, user, sidebarHeight = "h-scree
 
               <div className="relative shrink-0">
                 <button onClick={() => setProfileOpen((p) => !p)} className="flex items-center gap-2.5">
-                  <img src={profilePicLink} alt={displayName} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover" />
+                  <span className="relative">
+                    {showPhoto ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={avatarSrc}
+                        alt={displayName}
+                        onError={() => setImgFailed(true)}
+                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white text-sm font-semibold flex items-center justify-center">
+                        {initials}
+                      </span>
+                    )}
+                    {notificationNumber > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
+                        {notificationNumber}
+                      </span>
+                    )}
+                  </span>
                   <div className="leading-tight hidden sm:block text-left">
-                    <p className="text-sm font-semibold text-slate-800">{displayName}</p>
-                    <p className="text-[11px] text-blue-500 font-medium">{t(purchasePlan)}</p>
+                    <p className="text-sm font-semibold text-slate-800 max-w-[180px] truncate">{displayName}</p>
+                    {purchasePlan && (
+                      <p className="text-[11px] text-blue-500 font-medium">{t(purchasePlan)}</p>
+                    )}
                   </div>
                   <svg className="w-4 h-4 text-slate-400 hidden sm:block" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
