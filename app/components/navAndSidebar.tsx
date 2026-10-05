@@ -17,6 +17,7 @@ interface pageInfoProps {
   ];
   sidebarHeight?: string;
   children?: ReactNode;
+  menu?: { name: string; key: string }[]; // optional: overrides the menu from pageConfig
 }
 
 interface PageItem {
@@ -42,9 +43,20 @@ function menuFor(pageKey: string): PageItem[] {
   return getMenuFor(pageKey).map((m) => ({ name: m.name, path: `/pages/${m.key}` }));
 }
 
-function SidebarContent({ highlightLink, onLinkClick }: { highlightLink: string; onLinkClick?: () => void }) {
+function SidebarContent({
+  highlightLink,
+  onLinkClick,
+  menu,
+}: {
+  highlightLink: string;
+  onLinkClick?: () => void;
+  menu?: { name: string; key: string }[];
+}) {
   const { t } = useLanguage();
-  const { n1: listOfPageNames, n2: listOfPages } = separatePageData(menuFor(highlightLink));
+  const items: PageItem[] = menu
+    ? menu.map((m) => ({ name: m.name, path: `/pages/${m.key}` }))
+    : menuFor(highlightLink);
+  const { n1: listOfPageNames, n2: listOfPages } = separatePageData(items);
 
   return (
     <div className="flex flex-col min-h-0">
@@ -103,7 +115,7 @@ function LanguageSelect() {
   );
 }
 
-export default function NavAndSidebar({ pageInfo, user, sidebarHeight = "h-screen", children }: pageInfoProps) {
+export default function NavAndSidebar({ pageInfo, user, sidebarHeight = "h-screen", children, menu }: pageInfoProps) {
   const [title, titleDescription, highlightLink] = pageInfo;
   const [name, profilePicLink, notificationNumber, purchasePlan] = user;
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -143,7 +155,7 @@ export default function NavAndSidebar({ pageInfo, user, sidebarHeight = "h-scree
       <div className="flex min-h-screen">
         {/* DESKTOP SIDEBAR */}
         <aside className={`hidden lg:flex flex-col bg-[#0a0e2e] text-slate-300 sticky top-0 w-60 shrink-0 ${sidebarHeight}`}>
-          <SidebarContent highlightLink={highlightLink} />
+          <SidebarContent highlightLink={highlightLink} menu={menu} />
         </aside>
 
         {/* MOBILE SIDEBAR OVERLAY */}
@@ -158,7 +170,7 @@ export default function NavAndSidebar({ pageInfo, user, sidebarHeight = "h-scree
                   </svg>
                 </button>
               </div>
-              <SidebarContent highlightLink={highlightLink} onLinkClick={() => setMobileSidebarOpen(false)} />
+              <SidebarContent highlightLink={highlightLink} menu={menu} onLinkClick={() => setMobileSidebarOpen(false)} />
             </aside>
           </div>
         )}
