@@ -4,37 +4,22 @@
   Applications & Reports page  (/pages/reports)
   Title + description come from pageConfig.ts (shared layout).
 
-  Data: Supabase table "user_documents" (RLS returns only this user's rows)
-  - type "application"  -> content: { title, company, status, cv_url, cover_letter_url, url, applied_at }
-                           status: "Applied" | "Pending" | "Interview" | "Rejected" | "Offer"
-  - type "job"          -> content: { match_score, ... }   (jobs found by the automation)
-  - type "resume"       -> counted as "CVs Generated"
-  - type "cover_letter" -> counted as "Cover Letters Generated"
+  Data: GET /api/reports  (server route, one JSON shape)
+  - Route A: Supabase table "user_documents"  (types: application, job, resume, cover_letter)
+  - Route B: n8n workflow "getJobReport" (reads the n8n data table)
+  REPORTS_SOURCE in .env.local picks which one is tried first; if it fails the other one is
+  used automatically and `fallback: true` is returned (a small notice is shown below).
 */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
-import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useT } from "@/app/contexts/LanguageContext";
+import type { ReportApplication, ReportResponse } from "@/lib/reports/types";
 
 /* ------------------------------------------------------------------ */
-/* Types & helpers                                                     */
+/* Helpers                                                             */
 /* ------------------------------------------------------------------ */
-type AppContent = {
-  title?: string;
-  company?: string;
-  status?: string;
-  cv_url?: string;
-  cover_letter_url?: string;
-  url?: string;
-  applied_at?: string;
-};
-type Row<T> = { id: string; type: string; created_at: string; content: T };
-
-// A job counts as "matching" at or above this score.
-const MATCH_THRESHOLD = 70;
-
 const STATUS_STYLES: Record<string, string> = {
   interview: "bg-emerald-500 text-white",
   applied: "bg-blue-500 text-white",
@@ -43,18 +28,33 @@ const STATUS_STYLES: Record<string, string> = {
   offer: "bg-violet-500 text-white",
 };
 const STATUSES = ["Applied", "Pending", "Interview", "Rejected", "Offer"];
-
-const appliedDate = (r: Row<AppContent>) => new Date(r.content?.applied_at || r.created_at);
-const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-
-// Monday 00:00 of the week that contains `d`
-function startOfWeek(d: Date) {
-  const s = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const day = (s.getDay() + 6) % 7; // Mon = 0
-  s.setDate(s.getDate() - day);
-  return s;
-}
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+// "YYYY-MM-DD" -> Date at UTC midnight (so the day never shifts with the browser time zone)
+const toDate = (s: string | null) => (s ? new Date(`${s}T00:00:00Z`) : null);
+const fmtDate = (s: string | null) => {
+  const d = toDate(s);
+  return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "—";
+};
+function fmtWeek(startIso?: string, endIso?: string) {
+  const a = toDate(startIso ?? null);
+  const b = toDate(endIso ?? null);
+  if (!a || !b) return "";
+  const o = { timeZone: "UTC" } as const;
+  if (a.getUTCMonth() === b.getUTCMonth()) {
+    return `${a.toLocaleDateString("en-US", { month: "long", day: "numeric", ...o })}–${b.toLocaleDateString("en-US", {
+      day: "numeric",
+      year: "numeric",
+      ...o,
+    })}`;
+  }
+  return `${a.toLocaleDateString("en-US", { month: "short", day: "numeric", ...o })} – ${b.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    ...o,
+  })}`;
+}
 
 /* ------------------------------------------------------------------ */
 /* Small UI pieces                                                     */
@@ -124,11 +124,10 @@ function FilterSelect({
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function ReportsPage() {
-  const supabase = createClient();
   const { user, loading: authLoading } = useAuth();
   const t = useT();
 
-  const [rows, setRows] = useState<Row<Record<string, unknown>>[]>([]);
+  const [report, setReport] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"applications" | "weekly">("applications");
@@ -139,91 +138,57 @@ export default function ReportsPage() {
   const [titleFilter, setTitleFilter] = useState("");
 
   /* ---------- Load data ---------- */
-  useEffect(() => {
-    if (!user) return;
-    const load = async () => {
-      setLoading(true);
-      setError("");
-      const { data, error } = await supabase
-        .from("user_documents")
-        .select("id, type, created_at, content")
-        .in("type", ["application", "job", "resume", "cover_letter"])
-        .order("created_at", { ascending: false });
-      if (error) {
-        console.error(error);
-        setError(t("Could not load your reports. Refresh the page to try again."));
-      }
-      setRows((data ?? []) as Row<Record<string, unknown>>[]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/reports", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setReport((await res.json()) as ReportResponse);
+    } catch (e) {
+      console.error(e);
+      setError(t("Could not load your reports. Refresh the page to try again."));
+    } finally {
       setLoading(false);
-    };
-    load();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, []);
 
-  const applications = useMemo(
-    () => rows.filter((r) => r.type === "application") as Row<AppContent>[],
-    [rows]
-  );
+  useEffect(() => {
+    if (user) load();
+  }, [user, load]);
 
-  /* ---------- Top stats ---------- */
-  const weekStart = startOfWeek(new Date());
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 7);
-  const inThisWeek = (d: Date) => d >= weekStart && d < weekEnd;
-  const statusOf = (r: Row<AppContent>) => (r.content?.status || "").toLowerCase();
+  const applications: ReportApplication[] = report?.applications ?? [];
+  const stats = report?.stats ?? { total: 0, thisWeek: 0, pending: 0, interview: 0 };
+  const weekly = report?.weekly ?? {
+    weekStart: "",
+    weekEnd: "",
+    jobsFound: 0,
+    matchingJobs: 0,
+    cvs: 0,
+    cvsGenerated: 0,
+    coverLetters: 0,
+    submitted: 0,
+    perDay: [0, 0, 0, 0, 0, 0, 0],
+  };
+  const topApplied = report?.topApplied ?? [];
 
-  const totalApps = applications.length;
-  const appsThisWeek = applications.filter((r) => inThisWeek(appliedDate(r))).length;
-  const pending = applications.filter((r) => statusOf(r) === "pending").length;
-  const interview = applications.filter((r) => statusOf(r) === "interview").length;
-
-  /* ---------- Weekly report ---------- */
-  const weekly = useMemo(() => {
-    const thisWeek = rows.filter((r) => inThisWeek(new Date(r.created_at)));
-    const jobs = thisWeek.filter((r) => r.type === "job");
-    const perDay = DAY_LABELS.map((_, i) => {
-      const dayStart = new Date(weekStart);
-      dayStart.setDate(dayStart.getDate() + i);
-      const dayEnd = new Date(dayStart);
-      dayEnd.setDate(dayEnd.getDate() + 1);
-      return jobs.filter((j) => {
-        const d = new Date(j.created_at);
-        return d >= dayStart && d < dayEnd;
-      }).length;
-    });
-    return {
-      jobsFound: jobs.length,
-      matchingJobs: jobs.filter((j) => Number(j.content?.match_score ?? 0) >= MATCH_THRESHOLD).length,
-      cvs: thisWeek.filter((r) => r.type === "resume").length,
-      coverLetters: thisWeek.filter((r) => r.type === "cover_letter").length,
-      submitted: applications.filter((r) => inThisWeek(appliedDate(r))).length,
-      perDay,
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, applications]);
-
-  const lastDay = new Date(weekEnd);
-  lastDay.setDate(lastDay.getDate() - 1);
-  const weekLabel = `${weekStart.toLocaleDateString("en-US", { month: "long", day: "numeric" })}–${lastDay.toLocaleDateString(
-    "en-US",
-    { day: "numeric", year: "numeric" }
-  )}`;
+  const weekLabel = fmtWeek(weekly.weekStart, weekly.weekEnd);
   const maxPerDay = Math.max(1, ...weekly.perDay);
 
   /* ---------- Filtered table ---------- */
   const titleOptions = useMemo(
-    () => Array.from(new Set(applications.map((r) => r.content?.title).filter(Boolean) as string[])).sort(),
+    () => Array.from(new Set(applications.map((r) => r.title).filter(Boolean))).sort(),
     [applications]
   );
   const filtered = applications.filter((r) => {
     const days = Number(dateFilter);
-    if (days > 0 && Date.now() - appliedDate(r).getTime() > days * 86400000) return false;
-    if (statusFilter && statusOf(r) !== statusFilter.toLowerCase()) return false;
-    if (titleFilter && r.content?.title !== titleFilter) return false;
+    const d = toDate(r.appliedAt);
+    if (days > 0 && d && Date.now() - d.getTime() > days * 86400000) return false;
+    if (statusFilter && r.status.toLowerCase() !== statusFilter.toLowerCase()) return false;
+    if (titleFilter && r.title !== titleFilter) return false;
     return true;
   });
-
-  const topApplied = applications.slice(0, 5);
 
   /* ---------- PDF ---------- */
   const downloadPdf = () => {
@@ -235,20 +200,19 @@ export default function ReportsPage() {
     const lines: [string, number][] = [
       ["Jobs Found", weekly.jobsFound],
       ["Matching Jobs", weekly.matchingJobs],
-      ["CVs Generated", weekly.cvs],
+      ["CVs", weekly.cvs],
+      ["CVs Generated", weekly.cvsGenerated],
       ["Cover Letters Generated", weekly.coverLetters],
       ["Applications Submitted", weekly.submitted],
     ];
     lines.forEach(([label, value], i) => doc.text(`${label}: ${value}`, 20, 48 + i * 8));
-    doc.text("Jobs found per day:", 20, 98);
-    DAY_LABELS.forEach((d, i) => doc.text(`${d}: ${weekly.perDay[i]}`, 26, 106 + i * 7));
+    doc.text("Jobs found per day:", 20, 106);
+    DAY_LABELS.forEach((d, i) => doc.text(`${d}: ${weekly.perDay[i]}`, 26, 114 + i * 7));
     if (topApplied.length) {
-      doc.text("Top applied jobs:", 20, 162);
-      topApplied.forEach((r, i) =>
-        doc.text(`${r.content?.title || "—"}  —  ${r.content?.company || "—"}`, 26, 170 + i * 7)
-      );
+      doc.text("Top applied jobs:", 20, 170);
+      topApplied.forEach((r, i) => doc.text(`${r.title || "—"}  —  ${r.company || "—"}`, 26, 178 + i * 7));
     }
-    doc.save(`weekly-report-${weekStart.toISOString().slice(0, 10)}.pdf`);
+    doc.save(`weekly-report-${weekly.weekStart || "current"}.pdf`);
   };
 
   if (authLoading) {
@@ -273,16 +237,30 @@ export default function ReportsPage() {
         ))}
       </div>
 
-      {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+          <span>{error}</span>
+          <button onClick={load} className="rounded-md border border-red-300 px-2.5 py-1 font-medium hover:bg-red-100">
+            {t("Retry")}
+          </button>
+        </div>
+      )}
+      {report?.fallback && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          {report.source === "supabase"
+            ? t("Showing data from Supabase because n8n is unavailable right now.")
+            : t("Showing data from n8n because Supabase is unavailable right now.")}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
         {/* ================= LEFT: Applications ================= */}
         <section className={`space-y-4 ${tab === "applications" ? "" : "hidden lg:block"}`}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label={t("Total Applications")} value={totalApps} />
-            <StatCard label={t("This Week")} value={appsThisWeek} />
-            <StatCard label={t("Pending")} value={pending} />
-            <StatCard label={t("Interview")} value={interview} />
+            <StatCard label={t("Total Applications")} value={stats.total} />
+            <StatCard label={t("This Week")} value={stats.thisWeek} />
+            <StatCard label={t("Pending")} value={stats.pending} />
+            <StatCard label={t("Interview")} value={stats.interview} />
           </div>
 
           <h2 className="text-lg font-semibold text-slate-800">{t("Filters")}</h2>
@@ -335,29 +313,28 @@ export default function ReportsPage() {
                   </tr>
                 ) : (
                   filtered.map((r) => {
-                    const c = r.content ?? {};
-                    const st = statusOf(r);
+                    const st = r.status.toLowerCase();
                     return (
                       <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                        <td className="px-4 py-3 font-semibold text-slate-800">{c.title || "—"}</td>
-                        <td className="px-4 py-3 text-slate-600">{c.company || "—"}</td>
-                        <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{fmtDate(appliedDate(r))}</td>
-                        <td className="px-4 py-3"><ViewLink href={c.cv_url} label={t("View")} /></td>
-                        <td className="px-4 py-3"><ViewLink href={c.cover_letter_url} label={t("View")} /></td>
+                        <td className="px-4 py-3 font-semibold text-slate-800">{r.title || "—"}</td>
+                        <td className="px-4 py-3 text-slate-600">{r.company || "—"}</td>
+                        <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{fmtDate(r.appliedAt)}</td>
+                        <td className="px-4 py-3"><ViewLink href={r.cvUrl} label={t("View")} /></td>
+                        <td className="px-4 py-3"><ViewLink href={r.coverLetterUrl} label={t("View")} /></td>
                         <td className="px-4 py-3">
-                          {c.status ? (
+                          {r.status ? (
                             <span
                               className={`inline-block rounded-md px-2.5 py-1 text-xs font-medium ${
                                 STATUS_STYLES[st] ?? "bg-slate-200 text-slate-700"
                               }`}
                             >
-                              {t(c.status)}
+                              {t(r.status)}
                             </span>
                           ) : (
                             <span className="text-slate-300">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3"><ViewLink href={c.url} label={t("View")} icon /></td>
+                        <td className="px-4 py-3"><ViewLink href={r.url} label={t("View")} icon /></td>
                       </tr>
                     );
                   })
@@ -379,7 +356,7 @@ export default function ReportsPage() {
               <ReportStat label={t("Jobs Found")} value={weekly.jobsFound} />
               <ReportStat label={t("Matching Jobs")} value={weekly.matchingJobs} />
               <ReportStat label={t("CVs")} value={weekly.cvs} />
-              <ReportStat label={t("CVs Generated")} value={weekly.cvs} />
+              <ReportStat label={t("CVs Generated")} value={weekly.cvsGenerated} />
               <ReportStat label={t("Cover Letters Generated")} value={weekly.coverLetters} />
               <ReportStat label={t("Applications Submitted")} value={weekly.submitted} />
             </div>
@@ -422,8 +399,8 @@ export default function ReportsPage() {
               <ul>
                 {topApplied.map((r) => (
                   <li key={r.id} className="grid grid-cols-2 gap-3 px-5 py-3 text-sm border-b border-slate-100 last:border-0">
-                    <span className="font-medium text-slate-800 truncate">{r.content?.title || "—"}</span>
-                    <span className="text-slate-600 truncate">{r.content?.company || "—"}</span>
+                    <span className="font-medium text-slate-800 truncate">{r.title || "—"}</span>
+                    <span className="text-slate-600 truncate">{r.company || "—"}</span>
                   </li>
                 ))}
               </ul>
