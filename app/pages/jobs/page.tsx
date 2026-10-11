@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { createClient } from "@/lib/supabase/client";
-import { fetchJobs, NOT_AVAILABLE, type Job } from "@/lib/jobs";
-
+// import { fetchJobs, NOT_AVAILABLE, type Job } from "@/lib/jobs";
+import { fetchJobs, triggerJobSearch, NOT_AVAILABLE, type Job } from "@/lib/jobs";
 /* ------------------------------------------------------------------ */
 /* Jobs come from the n8n webhook (see lib/jobs.ts).                    */
 /* Columns: jobtitle, company, matchscore, location, applylink          */
@@ -83,13 +83,24 @@ export default function JobsPage() {
   const [companyFilter, setCompanyFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [minScore, setMinScore] = useState("0");
+  // Webhook search (search icon / Enter)
+  const [searching, setSearching] = useState(false);
+  const [searchNotice, setSearchNotice] = useState("");
+  const [activeSearch, setActiveSearch] = useState<string | null>(null);
 
+  // Name sent to n8n. Uses the name saved on the Supabase account, falls back to the email.
+  const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
+  const profileName =
+    String(meta.full_name || meta.name || meta.display_name || meta.username || "").trim() ||
+    user?.email?.split("@")[0] ||
+    "Unknown";
   /* ---------- Load jobs (n8n) + applied badges (Supabase) ---------- */
   const loadJobs = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     setError("");
-
+    setActiveSearch(null);
+    setSearchNotice("");
     try {
       // The job-data webhook is public job listings, so no token is sent.
       // Sending an Authorization header would force a CORS "preflight" request,
@@ -143,7 +154,8 @@ export default function JobsPage() {
 
   /* ---------- Apply filters ---------- */
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+        // When showing webhook results, don't filter them again by the typed text
+    const q = activeSearch ? "" : search.trim().toLowerCase();
     const min = Number(minScore);
 
     return jobs
@@ -156,7 +168,7 @@ export default function JobsPage() {
         return [j.jobTitle, j.company, j.location].join(" ").toLowerCase().includes(q);
       })
       .sort((a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1)); // no score goes last
-  }, [jobs, search, titleFilter, companyFilter, locationFilter, minScore]);
+    }, [jobs, search, activeSearch, titleFilter, companyFilter, locationFilter, minScore]);
 
   const strongMatches = filtered.filter((j) => (j.matchScore ?? 0) >= STRONG_MATCH).length;
 
@@ -189,7 +201,45 @@ export default function JobsPage() {
     }
     setAppliedJobIds((prev) => new Set(prev).add(job.id));
   };
+  /* ---------- Search icon / Enter: send job title + profile name to n8n ---------- */
+  const handleSearch = async () => {
+    const jobTitle = search.trim();
+    if (!jobTitle) {
+      setSearchNotice("Type a job title first, then press Enter or click the search icon.");
+      return;
+    }
+    if (searching) return;
 
+    setSearching(true);
+    setError("");
+    setSearchNotice("");
+    try {
+      const { jobs: results } = await triggerJobSearch({
+        jobTitle,
+        profileName,
+        email: user?.email ?? "",
+        userId: user?.id ?? "",
+      });
+
+      if (results) {
+        // n8n answered with jobs: show them right away
+        setJobs(results);
+        setActiveSearch(jobTitle);
+        setSearchNotice(
+          results.length
+            ? `Showing ${results.length} ${results.length === 1 ? "result" : "results"} for "${jobTitle}".`
+            : `No jobs found for "${jobTitle}". Try a different title.`
+        );
+      } else {
+        // n8n only confirmed it started: results will arrive in the job list later
+        setSearchNotice(`Searching for "${jobTitle}"... New jobs will appear here shortly. Click Refresh to check.`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The job search failed. Please try again.");
+    } finally {
+      setSearching(false);
+    }
+  };
   const resetFilters = () => {
     setSearch("");
     setTitleFilter("");
@@ -216,18 +266,60 @@ export default function JobsPage() {
       )}
 
       {/* Search */}
-      <div className="flex items-stretch bg-white rounded-lg border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-indigo-200">
+            <div className="flex items-stretch bg-white rounded-lg border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-indigo-200">
         <span className="px-3 flex items-center text-sm text-slate-600 bg-slate-50 border-r border-slate-200 whitespace-nowrap">
           Search Jobs
         </span>
         <input
           type="text"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by job title, company or location..."
+          onChange={(e) => {
+            setSearch(e.target.value);
+            if (searchNotice) setSearchNotice("");
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleSearch();
+            }
+          }}
+          placeholder="Type a job title and press Enter..."
+          aria-label="Search jobs by job title"
           className="flex-1 min-w-0 px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
         />
+        <button
+          type="button"
+          onClick={handleSearch}
+          disabled={searching}
+          aria-label="Search"
+          title="Search"
+          className="px-4 flex items-center justify-center text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 transition"
+        >
+          {searching ? (
+            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+              strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+          )}
+        </button>
       </div>
+
+      {searchNotice && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg bg-indigo-50 border border-indigo-100 text-sm text-indigo-700">
+          <span>{searchNotice}</span>
+          {activeSearch && (
+            <button onClick={loadJobs} className="font-medium text-indigo-700 hover:text-indigo-900 underline">
+              Show all jobs
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
