@@ -63,7 +63,20 @@ function ScoreCell({ score }: { score: number | null }) {
   const color = score >= STRONG_MATCH ? "text-emerald-600" : score >= 70 ? "text-amber-600" : "text-slate-500";
   return <span className={`font-medium ${color}`}>{score}%</span>;
 }
-
+/** Shows a "View" link when the file exists, otherwise "Not available". */
+function ViewLink({ href }: { href: string | null }) {
+  if (!href) return <span className="text-slate-400 leading-tight">{NOT_AVAILABLE}</span>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+    >
+      View
+    </a>
+  );
+}
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
@@ -154,7 +167,7 @@ export default function JobsPage() {
 
   /* ---------- Apply filters ---------- */
   const filtered = useMemo(() => {
-        // When showing webhook results, don't filter them again by the typed text
+    // When showing webhook results, don't filter them again by the typed text
     const q = activeSearch ? "" : search.trim().toLowerCase();
     const min = Number(minScore);
 
@@ -168,7 +181,7 @@ export default function JobsPage() {
         return [j.jobTitle, j.company, j.location].join(" ").toLowerCase().includes(q);
       })
       .sort((a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1)); // no score goes last
-    }, [jobs, search, activeSearch, titleFilter, companyFilter, locationFilter, minScore]);
+  }, [jobs, search, activeSearch, titleFilter, companyFilter, locationFilter, minScore]);
 
   const strongMatches = filtered.filter((j) => (j.matchScore ?? 0) >= STRONG_MATCH).length;
 
@@ -266,7 +279,7 @@ export default function JobsPage() {
       )}
 
       {/* Search */}
-            <div className="flex items-stretch bg-white rounded-lg border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-indigo-200">
+      <div className="flex items-stretch bg-white rounded-lg border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-indigo-200">
         <span className="px-3 flex items-center text-sm text-slate-600 bg-slate-50 border-r border-slate-200 whitespace-nowrap">
           Search Jobs
         </span>
@@ -335,9 +348,8 @@ export default function JobsPage() {
           <p className="text-sm text-slate-700">
             {loading
               ? "Loading jobs..."
-              : `${filtered.length} ${filtered.length === 1 ? "job" : "jobs"} found • ${strongMatches} strong ${
-                  strongMatches === 1 ? "match" : "matches"
-                }`}
+              : `${filtered.length} ${filtered.length === 1 ? "job" : "jobs"} found • ${strongMatches} strong ${strongMatches === 1 ? "match" : "matches"
+              }`}
           </p>
           <button
             onClick={loadJobs}
@@ -353,21 +365,33 @@ export default function JobsPage() {
           than the screen. So the left-right scrollbar always sits at the bottom of the
           visible area, and there is only one horizontal scrollbar.
         */}
-        <div className="overflow-auto overscroll-contain max-h-[70vh] md:max-h-[calc(100dvh-22rem)] min-h-[16rem]">
-          <table className="w-full min-w-[720px] text-sm">
+        {/* Only scrolls up/down. Columns have fixed widths, so the table always fits the box. */}
+        <div className="overflow-y-auto overscroll-contain max-h-[70vh] md:max-h-[calc(100dvh-22rem)] min-h-[16rem]">
+          <table className="w-full table-fixed text-sm">
+            <colgroup>
+              <col className="w-[24%]" />{/* Job Title */}
+              <col className="w-[15%]" />{/* Company */}
+              <col className="w-[14%]" />{/* Location */}
+              <col className="w-[10%]" />{/* Match Score */}
+              <col className="w-[9%]" />{/* CV */}
+              <col className="w-[11%]" />{/* Cover Letter */}
+              <col className="w-[17%]" />{/* Apply */}
+            </colgroup>
             <thead>
               <tr className="text-left text-slate-600">
-                <th className="sticky top-0 z-10 bg-slate-50 px-5 py-3 font-medium">Job Title</th>
+                <th className="sticky top-0 z-10 bg-slate-50 px-4 py-3 font-medium">Job Title</th>
                 <th className="sticky top-0 z-10 bg-slate-50 px-3 py-3 font-medium">Company</th>
                 <th className="sticky top-0 z-10 bg-slate-50 px-3 py-3 font-medium">Location</th>
-                <th className="sticky top-0 z-10 bg-slate-50 px-3 py-3 font-medium whitespace-nowrap">Match Score</th>
-                <th className="sticky top-0 z-10 bg-slate-50 px-5 py-3 font-medium">Apply</th>
+                <th className="sticky top-0 z-10 bg-slate-50 px-3 py-3 font-medium">Match Score</th>
+                <th className="sticky top-0 z-10 bg-slate-50 px-3 py-3 font-medium">CV</th>
+                <th className="sticky top-0 z-10 bg-slate-50 px-3 py-3 font-medium">Cover Letter</th>
+                <th className="sticky top-0 z-10 bg-slate-50 px-4 py-3 font-medium">Apply</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-10 text-center text-slate-400">Loading jobs...</td>
+                  <td colSpan={7} className="px-5 py-10 text-center text-slate-400">Loading jobs...</td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
@@ -391,16 +415,17 @@ export default function JobsPage() {
                       <td className="px-3 py-3.5 min-w-[160px] max-w-[260px] break-words"><Cell value={job.company} /></td>
                       <td className="px-3 py-3.5 min-w-[160px] max-w-[260px] break-words"><Cell value={job.location} /></td>
                       <td className="px-3 py-3.5 whitespace-nowrap"><ScoreCell score={job.matchScore} /></td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-3 py-3.5"><ViewLink href={job.cvLink} /></td>
+                      <td className="px-3 py-3.5"><ViewLink href={job.coverLetterLink} /></td>
+                      <td className="px-4 py-3.5">
                         {job.applyLink ? (
                           <button
                             onClick={() => handleApply(job)}
                             disabled={applyingId === job.id}
-                            className={`px-4 py-1.5 text-sm font-medium rounded-md whitespace-nowrap transition ${
-                              applied
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : "bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-60"
-                            }`}
+                            className={`px-4 py-1.5 text-sm font-medium rounded-md whitespace-nowrap transition ${applied
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-60"
+                              }`}
                           >
                             {applied ? "Applied" : applyingId === job.id ? "Saving..." : "Apply"}
                           </button>

@@ -15,6 +15,8 @@ export type Job = {
   company: string | null;
   location: string | null;
   matchScore: number | null;
+  cvLink: string | null;
+  coverLetterLink: string | null;
   applyLink: string | null;
 };
 
@@ -77,6 +79,10 @@ export const normalizeJob = (row: RawRow, index: number): Job => {
   const company = pick(row, ["company", "company_name", "companyName"]);
   const location = pick(row, ["location", "job_location"]);
   const matchScore = toScore(pick(row, ["matchscore", "matchScore", "match_score", "score"]));
+  const cvLink = toSafeUrl(pick(row, ["cvlink", "cvLink", "cv_link", "cv_url", "cvUrl"]));
+  const coverLetterLink = toSafeUrl(
+    pick(row, ["coverletterlink", "coverLetterLink", "cover_letter_link", "cover_letter_url", "coverLetterUrl"])
+  );
   const applyLink = toSafeUrl(
     pick(row, ["applylink", "applyLink", "apply_link", "apply_url", "applyUrl", "url", "link"])
   );
@@ -85,7 +91,7 @@ export const normalizeJob = (row: RawRow, index: number): Job => {
   const rawId = pick(row, ["id", "job_id", "jobId"]);
   const id = rawId || applyLink || `${jobTitle ?? "job"}|${company ?? ""}|${location ?? ""}|${index}`;
 
-  return { id, jobTitle, company, location, matchScore, applyLink };
+  return { id, jobTitle, company, location, matchScore, cvLink, coverLetterLink, applyLink };
 };
 
 /** Calls the n8n webhook and returns clean jobs. Throws an Error with a user-friendly message. */
@@ -104,7 +110,7 @@ export async function fetchJobs(accessToken?: string): Promise<Job[]> {
     // Browsers report CORS blocks and offline errors the same way, so the message covers both
     console.error(
       `Request to ${JOBS_WEBHOOK_URL} failed. Check: 1) the n8n workflow is published/active, ` +
-        `2) the Webhook node's Allowed Origins includes ${typeof window !== "undefined" ? window.location.origin : "this site"}.`
+      `2) the Webhook node's Allowed Origins includes ${typeof window !== "undefined" ? window.location.origin : "this site"}.`
     );
     throw new Error("Could not reach the job service. Check your connection and try again.");
   }
@@ -169,7 +175,7 @@ export async function triggerJobSearch(input: SearchInput): Promise<{ jobs: Job[
   } catch {
     console.error(
       `Request to ${SEARCH_WEBHOOK_URL} failed. Check that the n8n workflow is published and ` +
-        `that the Webhook node's Allowed Origins includes this website.`
+      `that the Webhook node's Allowed Origins includes this website.`
     );
     throw new Error("Could not reach the job search service. Please try again.");
   }
