@@ -16,7 +16,7 @@ export type PageConfig = {
 // ---------------------------------------------------------------------------
 
 // Shown on both groups
-const SHARED = ["Dashboard","profile",];
+const SHARED = ["Dashboard", "profile"];
 
 // Manual-user pages: on any of these pages, the menu shows only this group
 export const MANUAL_MENU = [
@@ -38,44 +38,53 @@ export const PAGE_CONFIG: Record<string, PageConfig> = {
   // ----- Manual pages -----
   Resume_Generator: {
     title: "Resume Generator",
-    description: "Upload your CV and a job description to get an ATS score, skill-gap analysis and an optimized resume.",
+    description:
+      "Upload your CV and a job description to get an ATS score, skill-gap analysis and an optimized resume.",
     menu: MANUAL_MENU,
   },
   coverLetterGenerator: {
     title: "AI Cover Letter Generator",
-    description: "Create tailored, professional cover letters for any job description in seconds.",
+    description:
+      "Create tailored, professional cover letters for any job description in seconds.",
     menu: MANUAL_MENU,
   },
   Interview_Prep_AI: {
     title: "Interview Prep AI",
-    description: "Get a personalized interview preparation guide with technical, behavioral and HR questions.",
+    description:
+      "Get a personalized interview preparation guide with technical, behavioral and HR questions.",
     menu: MANUAL_MENU,
   },
   ApplicationsStatus: {
     title: "Applications Status",
-    description: "Track, manage and organize your job applications in one place.",
+    description:
+      "Track, manage and organize your job applications in one place.",
     menu: MANUAL_MENU,
   },
 
   // ----- Automated pages -----
   jobs: {
     title: "Jobs",
-    description: "See the jobs found by your automated job search and track its progress.",
+    description:
+      "See the jobs found by your automated job search and track its progress.",
     menu: AUTOMATED_MENU,
   },
   reports: {
     title: "Applications & Reports",
-    description: "Track your job applications and see your weekly job search report.",
+    description:
+      "Track your job applications and see your weekly job search report.",
     menu: AUTOMATED_MENU,
   },
 
   // ----- Shared pages (no "menu" -> full menu, since they belong to both groups) -----
-   Dashboard: {
+  Dashboard: {
     title: "Dashboard Overview",
     description: "Track your daily analytics and user growth in real-time.",
   },
-  profile: { title: "Profile", description: "View and update your personal information and CV details." },
-  
+  profile: {
+    title: "Profile",
+    description: "View and update your personal information and CV details.",
+    menu: AUTOMATED_MENU,
+  },
 };
 
 // Sidebar menu: every possible item, in display order.
