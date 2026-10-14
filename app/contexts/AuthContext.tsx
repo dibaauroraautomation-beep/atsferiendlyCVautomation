@@ -37,9 +37,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .from("profiles")
       .select("*")
       .eq("id", userId)
-      .single();
-    if (error) console.error("Profile load failed:", error.message);
-    setProfile(data ?? null);
+      .maybeSingle(); // no profile row yet -> data = null (no error), unlike .single()
+    if (error) {
+      // warn (not error) so the Next.js dev overlay does not open for a missing/blocked profile
+      console.warn("Profile load failed:", error.code, error.message || error.details || error.hint);
+    }
+    setProfile((data as Profile | null) ?? null);
   };
 
   useEffect(() => {

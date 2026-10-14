@@ -1,6 +1,4 @@
-// Put this file in the PROJECT ROOT (same level as the "app" folder).
-// If you are on Next.js 16+, rename the file to "proxy.ts" and rename the
-// exported function from "middleware" to "proxy".
+// Next.js 16 "proxy" file (formerly "middleware"). Lives in the PROJECT ROOT, next to the "app" folder.
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -8,7 +6,7 @@ const LOGIN_PATH = "/pages/login";
 const MANUAL_HOME = "/pages/Dashboard";
 const AUTOMATED_HOME = "/pages/automatic-Dashboard";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

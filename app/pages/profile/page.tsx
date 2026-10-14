@@ -49,6 +49,56 @@ const PLACEHOLDER_CV = {
 type Profile = typeof PLACEHOLDER_PROFILE;
 type CvData = typeof PLACEHOLDER_CV;
 
+/* Rows of the n8n table "Candidate cvinfo(ats cv)" -> page state */
+type CvRow = Record<string, unknown>;
+const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+const lines = (v: unknown, sep: RegExp) =>
+  str(v)
+    .split(sep)
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+function rowToProfile(row: CvRow, prev: Profile, email: string): Profile {
+  return {
+    ...prev,
+    fullName: str(row.name) || prev.fullName,
+    email: str(row.email) || email || prev.email,
+    cvLanguage: str(row.cvLanguage) || prev.cvLanguage,
+    location: str(row.location) || prev.location,
+    targetJobs: str(row.targetjob) || prev.targetJobs,
+    experienceLevel: str(row.experiencelevel) || prev.experienceLevel,
+    cvFileName: str(row.cvfilename) || prev.cvFileName,
+    uploadDate: str(row.uploaddate) || prev.uploadDate,
+  };
+}
+
+function rowToCv(row: CvRow, prev: CvData): CvData {
+  let personal = prev.personal;
+  try {
+    const parsed = JSON.parse(str(row.personalinfo) || "[]");
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      personal = parsed
+        .filter((x) => x && typeof x === "object")
+        .map((x) => ({ label: str((x as PersonalItem).label), value: str((x as PersonalItem).value) }));
+    }
+  } catch {
+    /* keep the current personal info */
+  }
+  const pick = (v: unknown, sep: RegExp, fallback: string[]) => {
+    const a = lines(v, sep);
+    return a.length > 0 ? a : fallback;
+  };
+  return {
+    personal,
+    education: pick(row.education, /\n/, prev.education),
+    experience: pick(row.experience, /\n/, prev.experience),
+    skills: pick(row.skill, /[\n,]/, prev.skills),
+    projects: pick(row.project, /\n/, prev.projects),
+    certifications: pick(row.certificate, /\n/, prev.certifications),
+    languages: pick(row.language, /\n/, prev.languages),
+  };
+}
+
 type CvFile = {
   url: string;
   name: string;
@@ -180,11 +230,13 @@ function Section({
   items,
   onChange,
   variant = "plain",
+  onDone,
 }: {
   title: string;
   items: string[];
   onChange: (items: string[]) => void;
   variant?: Variant;
+  onDone?: (items: string[]) => void; // called when the user presses Done (e.g. to send the CV)
 }) {
   const t = useT();
   const [editing, setEditing] = useState(false);
@@ -195,8 +247,10 @@ function Section({
 
   const finish = () => {
     // drop empty rows when leaving edit mode
-    onChange(items.map((x) => x.trim()).filter(Boolean));
+    const cleaned = items.map((x) => x.trim()).filter(Boolean);
+    onChange(cleaned);
     setEditing(false);
+    onDone?.(cleaned);
   };
 
   return (
@@ -269,10 +323,12 @@ function PersonalSection({
   title,
   items,
   onChange,
+  onDone,
 }: {
   title: string;
   items: PersonalItem[];
   onChange: (items: PersonalItem[]) => void;
+  onDone?: (items: PersonalItem[]) => void;
 }) {
   const t = useT();
   const [editing, setEditing] = useState(false);
@@ -291,7 +347,12 @@ function PersonalSection({
         <h4 className="text-sm font-semibold text-slate-800">{title}</h4>
         <button
           type="button"
-          onClick={() => (editing ? setEditing(false) : start())}
+          onClick={() => {
+            if (editing) {
+              setEditing(false);
+              onDone?.(items);
+            } else start();
+          }}
           className={`text-xs font-medium ${editing ? "text-indigo-600" : "text-slate-500 hover:text-indigo-600"}`}
         >
           {editing ? t("Done") : t("Edit")}
@@ -518,6 +579,39 @@ export default function ProfilePage() {
   const [cv, setCv] = useState<CvData>(PLACEHOLDER_CV);
   const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [sendMsg, setSendMsg] = useState("");
+  const [fetchState, setFetchState] = useState<"idle" | "loading" | "loaded" | "empty" | "error">("idle");
+  const [fetchMsg, setFetchMsg] = useState("");
+
+  /* Load the saved row (matched by the logged-in email) from the n8n table. */
+  const fetchSaved = async () => {
+    setFetchState("loading");
+    setFetchMsg("");
+    try {
+      const res = await fetch("/api/profile-cv/fetch", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      const email: string = data.email || "";
+      if (!data.row) {
+        if (email) {
+          setProfile((p) => ({ ...p, email }));
+        }
+        setFetchState("empty");
+        return;
+      }
+      const row = data.row as CvRow;
+      setProfile((p) => rowToProfile(row, p, email));
+      setCv((c) => rowToCv(row, c));
+      setFetchState("loaded");
+    } catch (err) {
+      setFetchMsg(err instanceof Error ? err.message : "Something went wrong");
+      setFetchState("error");
+    }
+  };
+  // when the page opens
+  useEffect(() => {
+    fetchSaved();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [cvFile, setCvFile] = useState<CvFile | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -561,6 +655,7 @@ export default function ProfilePage() {
   const saveEdit = () => {
     setProfile(draft);
     setEditingProfile(false);
+    sendCv(draft, cv); // Save also sends the complete CV
   };
   const cancelEdit = () => setEditingProfile(false);
   const setD = (k: keyof Profile) => (v: string) => setDraft((d) => ({ ...d, [k]: v }));
@@ -598,18 +693,39 @@ export default function ProfilePage() {
     setCv((c) => ({ ...c, [k]: items }));
     setSendState("idle");
   };
-  const updateInfo = async () => {
+  /* Build the full PDF from the given data and send it (with the user's email) to n8n. */
+  const sendCv = async (p: Profile, c: CvData) => {
     setSendState("sending");
     setSendMsg("");
     try {
       const photoDataUrl = photo ? await photoToCircleDataUrl(photo) : null;
-      const blob = buildCvPdf({ profile, cv, photoDataUrl, page: PAGE_SIZES[pageSize] });
-      const safeName = (profile.fullName || "CV").replace(/[^\w-]+/g, "_");
+      const blob = buildCvPdf({ profile: p, cv: c, photoDataUrl, page: PAGE_SIZES[pageSize] });
+      const cvName = c.personal.find((x) => x.label === "Name")?.value || p.fullName;
+      const safeName = (cvName || "CV").trim().replace(/[^\w-]+/g, "_");
 
       const fd = new FormData();
       fd.append("cv", blob, `${safeName}_CV.pdf`);
-      fd.append("profile", JSON.stringify(profile));
-      fd.append("cvInfo", JSON.stringify(cv));
+      fd.append("name", cvName);
+      fd.append("email", p.email);
+      fd.append("location", p.location);
+      fd.append("targetJobs", p.targetJobs);
+      fd.append("experienceLevel", p.experienceLevel);
+      fd.append("cvLanguage", p.cvLanguage);
+      // flat fields named exactly like the n8n table columns ("Candidate cvinfo(ats cv)")
+      const join = (a: string[], sep: string) => a.join(sep);
+      fd.append("targetjob", p.targetJobs);
+      fd.append("experiencelevel", p.experienceLevel);
+      fd.append("cvfilename", p.cvFileName);
+      fd.append("uploaddate", p.uploadDate);
+      fd.append("personalinfo", JSON.stringify(c.personal));
+      fd.append("education", join(c.education, "\n"));
+      fd.append("skill", join(c.skills, ", "));
+      fd.append("experience", join(c.experience, "\n"));
+      fd.append("certificate", join(c.certifications, "\n"));
+      fd.append("project", join(c.projects, "\n"));
+      fd.append("language", join(c.languages, "\n"));
+      fd.append("profile", JSON.stringify({ ...p, fullName: cvName }));
+      fd.append("cvInfo", JSON.stringify(c));
       fd.append("pageSize", pageSize);
 
       const res = await fetch("/api/profile-cv", { method: "POST", body: fd });
@@ -623,6 +739,9 @@ export default function ProfilePage() {
       setSendState("error");
     }
   };
+  const updateInfo = () => sendCv(profile, cv);
+  // a CV card's "Done" button: save that card, then send the complete CV
+  const doneSection = (k: Exclude<keyof CvData, "personal">) => (items: string[]) => sendCv(profile, { ...cv, [k]: items });
 
   /* ---- layout ---- */
   const gridCls = previewMax ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1fr)_240px]";
@@ -793,21 +912,21 @@ export default function ProfilePage() {
                 <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
                   {/* column 1 */}
                   <div className="space-y-3">
-                    <PersonalSection title={t("Personal Information")} items={cv.personal} onChange={(items) => { setCv((c) => ({ ...c, personal: items })); setSendState("idle"); }} />
-                    <Section title={t("Skills")} items={cv.skills} onChange={setSection("skills")} variant="chips" />
+                    <PersonalSection title={t("Personal Information")} items={cv.personal} onChange={(items) => { setCv((c) => ({ ...c, personal: items })); setSendState("idle"); }} onDone={(items) => sendCv(profile, { ...cv, personal: items })} />
+                    <Section title={t("Skills")} items={cv.skills} onChange={setSection("skills")} onDone={doneSection("skills")} variant="chips" />
                   </div>
 
                   {/* column 2 */}
                   <div className="space-y-3">
-                    <Section title={t("Education")} items={cv.education} onChange={setSection("education")} />
-                    <Section title={t("Projects")} items={cv.projects} onChange={setSection("projects")} variant="bullet" />
+                    <Section title={t("Education")} items={cv.education} onChange={setSection("education")} onDone={doneSection("education")} />
+                    <Section title={t("Projects")} items={cv.projects} onChange={setSection("projects")} onDone={doneSection("projects")} variant="bullet" />
                   </div>
 
                   {/* column 3 */}
                   <div className="space-y-3">
-                    <Section title={t("Work Experience")} items={cv.experience} onChange={setSection("experience")} />
-                    <Section title={t("Certifications")} items={cv.certifications} onChange={setSection("certifications")} />
-                    <Section title={t("Languages")} items={cv.languages} onChange={setSection("languages")} />
+                    <Section title={t("Work Experience")} items={cv.experience} onChange={setSection("experience")} onDone={doneSection("experience")} />
+                    <Section title={t("Certifications")} items={cv.certifications} onChange={setSection("certifications")} onDone={doneSection("certifications")} />
+                    <Section title={t("Languages")} items={cv.languages} onChange={setSection("languages")} onDone={doneSection("languages")} />
                   </div>
                 </div>
 
@@ -827,6 +946,16 @@ export default function ProfilePage() {
                 {sendState === "error" && (
                   <p className="mt-2 text-center text-xs font-medium text-red-600" role="alert">
                     {t("Could not send CV")}: {sendMsg}
+                  </p>
+                )}
+                {fetchState === "empty" && (
+                  <p className="mt-2 text-center text-xs font-medium text-slate-500" role="status">
+                    {t("No saved info found for your email")}
+                  </p>
+                )}
+                {fetchState === "error" && (
+                  <p className="mt-2 text-center text-xs font-medium text-red-600" role="alert">
+                    {t("Could not fetch saved info")}: {fetchMsg}
                   </p>
                 )}
               </>
