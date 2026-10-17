@@ -120,6 +120,7 @@ type PageSize = keyof typeof PAGE_SIZES;
 const CV_LANGUAGES = ["English", "Deutsch"];
 const LEVELS = ["Junior", "Mid", "Senior", "Lead"];
 
+const UPLOAD_CV_WEBHOOK = "https://n8naurora.duckdns.org/webhook/info-extract-upload-cv";
 /* ------------------------------------------------------------------ */
 /* Icons                                                               */
 /* ------------------------------------------------------------------ */
@@ -410,9 +411,8 @@ function CvRendered({
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase())
     .join("");
-  const summary = `${name} is a ${profile.experienceLevel.toLowerCase()}-level candidate targeting ${profile.targetJobs}${
-    profile.location ? `, based in ${profile.location}` : ""
-  }.${cv.skills.length ? ` Listed strengths: ${cv.skills.join(", ")}.` : ""}`;
+  const summary = `${name} is a ${profile.experienceLevel.toLowerCase()}-level candidate targeting ${profile.targetJobs}${profile.location ? `, based in ${profile.location}` : ""
+    }.${cv.skills.length ? ` Listed strengths: ${cv.skills.join(", ")}.` : ""}`;
 
   /* sizes: tiny in the side card, normal when maximized */
   const sz = large
@@ -581,6 +581,8 @@ export default function ProfilePage() {
   const [sendMsg, setSendMsg] = useState("");
   const [fetchState, setFetchState] = useState<"idle" | "loading" | "loaded" | "empty" | "error">("idle");
   const [fetchMsg, setFetchMsg] = useState("");
+  const [uploadState, setUploadState] = useState<"idle" | "uploading" | "done" | "error">("idle");
+  const [uploadMsg, setUploadMsg] = useState("");
 
   /* Load the saved row (matched by the logged-in email) from the n8n table. */
   const fetchSaved = async () => {
@@ -663,6 +665,42 @@ export default function ProfilePage() {
   /* ---- CV upload / replace ---- */
   const pickFile = () => fileInput.current?.click();
 
+  // const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
+  //   const f = e.target.files?.[0];
+  //   e.target.value = ""; // allow picking the same file again
+  //   if (!f) return;
+
+  //   if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+  //   const url = URL.createObjectURL(f);
+  //   urlRef.current = url;
+
+  //   let text: string | undefined;
+  //   if (f.type.startsWith("text/") || /\.(txt|md)$/i.test(f.name)) {
+  //     text = await f.text();
+  //   }
+  /* Send the uploaded CV file to the n8n webhook */
+  const uploadCvToN8n = async (f: File) => {
+    setUploadState("uploading");
+    setUploadMsg("");
+    try {
+      const fd = new FormData();
+      fd.append("cv", f, f.name);              // the file itself
+      fd.append("email", profile.email);       // tells n8n whose CV this is
+      fd.append("fileName", f.name);
+      fd.append("uploadDate", new Date().toISOString());
+
+      // Don't set Content-Type yourself: the browser adds the correct multipart header
+      const res = await fetch(UPLOAD_CV_WEBHOOK, { method: "POST", body: fd });
+      if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+
+      setUploadState("done");
+      setProfile((p) => ({ ...p, status: "Uploaded successfully" }));
+    } catch (err) {
+      setUploadMsg(err instanceof Error ? err.message : "Something went wrong");
+      setUploadState("error");
+    }
+  };
+
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = ""; // allow picking the same file again
@@ -679,13 +717,14 @@ export default function ProfilePage() {
 
     setCvFile({ url, name: f.name, type: f.type, size: f.size, text });
     setPreviewTab("file");
-    // update the info shown next to / inside the preview
     setProfile((p) => ({
       ...p,
       cvFileName: f.name,
       uploadDate: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-      status: "Processed Successfully",
     }));
+
+    // send the file to n8n
+    await uploadCvToN8n(f);
   };
 
   /* ---- CV cards ---- */
@@ -774,31 +813,31 @@ export default function ProfilePage() {
               <div className="flex items-center gap-2">
                 {collapseBtn}
                 {(editingProfile ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={cancelEdit}
-                        className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        {t("Cancel")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={saveEdit}
-                        className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700"
-                      >
-                        {t("Save")}
-                      </button>
-                    </>
-                  ) : (
+                  <>
                     <button
                       type="button"
-                      onClick={startEdit}
+                      onClick={cancelEdit}
+                      className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      {t("Cancel")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveEdit}
                       className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700"
                     >
-                      {t("Edit Profile")}
+                      {t("Save")}
                     </button>
-                  ))}
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={startEdit}
+                    className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700"
+                  >
+                    {t("Edit Profile")}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -871,13 +910,13 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-slate-100 pt-4">
-                  <div className="flex flex-wrap gap-x-10 gap-y-3">
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50/60 px-4 py-3">
+                  <div className="flex flex-wrap gap-x-16 gap-y-3">
                     <Field label={t("CV filename")} value={profile.cvFileName} />
                     <Field label={t("Upload date")} value={profile.uploadDate} />
                     <div>
                       <p className="text-xs text-slate-500">{t("Status")}</p>
-                      <p className="mt-0.5 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                      <p className="mt-0.5 flex items-center gap-1.5 text-sm font-medium text-emerald-600">
                         <svg className="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
                           <path
                             fillRule="evenodd"
@@ -889,7 +928,7 @@ export default function ProfilePage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  {/* <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={pickFile}
@@ -897,6 +936,36 @@ export default function ProfilePage() {
                     >
                       {t("Upload CV")}
                     </button>
+                  </div> */}
+                  <div className="flex flex-col items-end gap-1">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => cvFile && window.open(cvFile.url, "_blank")}
+                        disabled={!cvFile}
+                        className="rounded-md border border-slate-300 bg-white px-3.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {t("View CV")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={pickFile}
+                        disabled={uploadState === "uploading"}
+                        className="rounded-md bg-indigo-600 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {uploadState === "uploading" ? t("Uploading...") : t("Replace CV")}
+                      </button>
+                    </div>
+                    {uploadState === "done" && (
+                      <p className="text-xs font-medium text-emerald-600" role="status">
+                        {t("CV sent to n8n")}
+                      </p>
+                    )}
+                    {uploadState === "error" && (
+                      <p className="text-xs font-medium text-red-600" role="alert">
+                        {t("Could not upload CV")}: {uploadMsg}
+                      </p>
+                    )}
                   </div>
                 </div>
               </>
