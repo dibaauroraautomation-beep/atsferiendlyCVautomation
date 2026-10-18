@@ -1,14 +1,11 @@
 // Route B: ask the n8n workflow "getJobReport" (server-side only).
 import type { ReportData } from "./types";
 
-const REPORTS_WEBHOOK_URL = "https://n8naurora.duckdns.org/webhook/e8c2ec9a-f2ef-4029-9161-9a1f82fa1ad7";
 const TIMEOUT_MS = 8000;
 
-export async function getReportFromN8n(email?: string | null): Promise<ReportData> {
-  const url = REPORTS_WEBHOOK_URL;
-  const secret = process.env.N8N_REPORTS_SECRET || "";
-  // Set REPORTS_FILTER_BY_EMAIL=false to return every row of the n8n table.
-  const filter = process.env.REPORTS_FILTER_BY_EMAIL !== "false";
+// url + secret = the n8n webhook link and secret (defined in app/api/reports/route.ts)
+export async function getReportFromN8n(url: string, secret: string, email?: string | null): Promise<ReportData> {
+  const filter = true; // only this user's rows
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
