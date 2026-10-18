@@ -2,13 +2,10 @@ import { NextRequest } from "next/server";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 // Forwards the generated CV (PDF + info) to the n8n workflow.
-// Set N8N_PROFILE_CV_WEBHOOK_URL in .env.local to the workflow's Webhook-node URL.
+// n8n webhook (production URL, workflow must be published).
 export async function POST(request: NextRequest) {
-  const webhook = process.env.N8N_PROFILE_CV_WEBHOOK_URL;
-  if (!webhook) {
-    return Response.json({ error: "N8N_PROFILE_CV_WEBHOOK_URL is not set in .env.local" }, { status: 500 });
-  }
-
+  const webhook = "https://n8naurora.duckdns.org/webhook/profile-cv";
+  // const webhook = "https://n8naurora.duckdns.org/webhook-test/profile-cv";
   const formData = await request.formData();
 
   // Who sent it: taken from the logged-in Supabase session (cannot be faked by the browser).

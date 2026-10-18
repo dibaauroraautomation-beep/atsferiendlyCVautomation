@@ -577,10 +577,38 @@ export default function ProfilePage() {
   const [editingProfile, setEditingProfile] = useState(false);
 
   const [cv, setCv] = useState<CvData>(PLACEHOLDER_CV);
-  const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "nochange" | "error">("idle");
   const [sendMsg, setSendMsg] = useState("");
   const [fetchState, setFetchState] = useState<"idle" | "loading" | "loaded" | "empty" | "error">("idle");
   const [fetchMsg, setFetchMsg] = useState("");
+
+  /* Cover letter (column "cover_letter"): written by the AI agent in n8n when empty, editable here */
+  const [coverLetter, setCoverLetter] = useState("");
+  const [coverDraft, setCoverDraft] = useState("");
+  const [coverEditing, setCoverEditing] = useState(false);
+  const [coverState, setCoverState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [coverMsg, setCoverMsg] = useState("");
+  /* What n8n already has: nothing is sent when the data is unchanged. */
+  const baselineRef = useRef<string | null>(null);
+  const snap = (p: Profile, c: CvData, letter: string) => JSON.stringify([p, c, letter, pageSize, photo]);
+  const saveCover = async (text: string) => {
+    if (text === coverLetter) {
+      setCoverEditing(false);
+      setCoverState("idle");
+      return;
+    }
+    setCoverState("saving");
+    setCoverMsg("");
+    const ok = await sendCv(profile, cv, text);
+    if (ok) {
+      setCoverLetter(text);
+      setCoverEditing(false);
+      setCoverState("saved");
+    } else {
+      setCoverMsg(t("Please try again"));
+      setCoverState("error");
+    }
+  };
   const [uploadState, setUploadState] = useState<"idle" | "uploading" | "done" | "error">("idle");
   const [uploadMsg, setUploadMsg] = useState("");
 
@@ -603,12 +631,18 @@ export default function ProfilePage() {
       const row = data.row as CvRow;
       setProfile((p) => rowToProfile(row, p, email));
       setCv((c) => rowToCv(row, c));
+      setCoverLetter(str(row.cover_letter));
       setFetchState("loaded");
     } catch (err) {
       setFetchMsg(err instanceof Error ? err.message : "Something went wrong");
       setFetchState("error");
     }
   };
+  // remember the loaded data as "already saved in n8n"
+  useEffect(() => {
+    if (fetchState === "loaded") baselineRef.current = snap(profile, cv, coverLetter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchState]);
   // when the page opens
   useEffect(() => {
     fetchSaved();
@@ -733,7 +767,12 @@ export default function ProfilePage() {
     setSendState("idle");
   };
   /* Build the full PDF from the given data and send it (with the user's email) to n8n. */
-  const sendCv = async (p: Profile, c: CvData) => {
+  const sendCv = async (p: Profile, c: CvData, coverOverride?: string): Promise<boolean> => {
+    const letterNow = coverOverride ?? coverLetter;
+    if (baselineRef.current !== null && baselineRef.current === snap(p, c, letterNow)) {
+      setSendState("nochange");
+      return true;
+    }
     setSendState("sending");
     setSendMsg("");
     try {
@@ -766,16 +805,22 @@ export default function ProfilePage() {
       fd.append("profile", JSON.stringify({ ...p, fullName: cvName }));
       fd.append("cvInfo", JSON.stringify(c));
       fd.append("pageSize", pageSize);
+      // saved/edited cover letter (only sent when there is one, so an empty value never blanks the cell)
+      const letter = coverOverride ?? coverLetter;
+      if (letter) fd.append("cover_letter", letter);
 
       const res = await fetch("/api/profile-cv", { method: "POST", body: fd });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `Request failed (${res.status})`);
       }
+      baselineRef.current = snap(p, c, letterNow);
       setSendState("sent");
+      return true;
     } catch (err) {
       setSendMsg(err instanceof Error ? err.message : "Something went wrong");
       setSendState("error");
+      return false;
     }
   };
   const updateInfo = () => sendCv(profile, cv);
@@ -1012,6 +1057,11 @@ export default function ProfilePage() {
                     {t("CV PDF sent successfully")}
                   </p>
                 )}
+                {sendState === "nochange" && (
+                  <p className="mt-2 text-center text-xs font-medium text-slate-500" role="status">
+                    {t("No changes to save")}
+                  </p>
+                )}
                 {sendState === "error" && (
                   <p className="mt-2 text-center text-xs font-medium text-red-600" role="alert">
                     {t("Could not send CV")}: {sendMsg}
@@ -1083,6 +1133,72 @@ export default function ProfilePage() {
             <div>
               <CvRendered profile={profile} cv={cv} photo={photo} large={previewMax} pageSize={pageSize} />
             </div>
+          )}
+        </Card>
+
+        <Card className="mt-4 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-slate-800">{t("Cover Letter")}</h4>
+            {coverEditing ? (
+              <div className="flex items-center gap-3 text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCoverEditing(false);
+                    setCoverState("idle");
+                  }}
+                  className="text-slate-500 hover:text-slate-700"
+                >
+                  {t("Cancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => saveCover(coverDraft.trim())}
+                  disabled={coverState === "saving"}
+                  className="text-indigo-600 hover:text-indigo-700 disabled:opacity-60"
+                >
+                  {coverState === "saving" ? t("Saving...") : t("Done")}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setCoverDraft(coverLetter);
+                  setCoverState("idle");
+                  setCoverEditing(true);
+                }}
+                className="text-xs font-medium text-slate-500 hover:text-indigo-600"
+              >
+                {t("Edit")}
+              </button>
+            )}
+          </div>
+
+          {coverEditing ? (
+            <textarea
+              className={`${inputCls} min-h-[260px] resize-y leading-relaxed`}
+              value={coverDraft}
+              onChange={(e) => setCoverDraft(e.target.value)}
+              aria-label={t("Cover Letter")}
+            />
+          ) : coverLetter ? (
+            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-600">{coverLetter}</p>
+          ) : (
+            <p className="text-[13px] text-slate-400">
+              {fetchState === "loading" ? t("Loading...") : t("Your cover letter will appear here once it is written.")}
+            </p>
+          )}
+
+          {coverState === "saved" && (
+            <p className="mt-2 text-xs font-medium text-emerald-600" role="status">
+              {t("Cover letter saved")}
+            </p>
+          )}
+          {coverState === "error" && (
+            <p className="mt-2 text-xs font-medium text-red-600" role="alert">
+              {t("Could not save cover letter")}: {coverMsg}
+            </p>
           )}
         </Card>
       </aside>

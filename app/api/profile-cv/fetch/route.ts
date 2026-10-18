@@ -2,13 +2,10 @@ import { createServerSupabase } from "@/lib/supabase/server";
 
 // Loads the logged-in user's saved CV info from the n8n data table "Candidate cvinfo(ats cv)".
 // The row is matched by the user's email through an n8n webhook.
-// Set N8N_PROFILE_CV_FETCH_WEBHOOK_URL in .env.local to that webhook's URL.
+// n8n webhook (production URL, workflow must be published).
 export async function GET() {
-  const webhook = process.env.N8N_PROFILE_CV_FETCH_WEBHOOK_URL;
-  if (!webhook) {
-    return Response.json({ error: "N8N_PROFILE_CV_FETCH_WEBHOOK_URL is not set in .env.local" }, { status: 500 });
-  }
-
+  const webhook = "https://n8naurora.duckdns.org/webhook/profile-cv-fetch";
+  // const webhook = "https://n8naurora.duckdns.org/webhook-test/profile-cv-fetch";
   // Who is asking: taken from the logged-in Supabase session (cannot be faked by the browser).
   let email = "";
   try {

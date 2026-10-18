@@ -20,13 +20,6 @@ import type { ReportApplication, ReportResponse } from "@/lib/reports/types";
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
-const STATUS_STYLES: Record<string, string> = {
-  interview: "bg-emerald-500 text-white",
-  applied: "bg-blue-500 text-white",
-  pending: "bg-amber-400 text-white",
-  rejected: "bg-red-500 text-white",
-  offer: "bg-violet-500 text-white",
-};
 const STATUSES = ["Applied", "Pending", "Interview", "Rejected", "Offer"];
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -136,6 +129,7 @@ export default function ReportsPage() {
   const [dateFilter, setDateFilter] = useState("0");
   const [statusFilter, setStatusFilter] = useState("");
   const [titleFilter, setTitleFilter] = useState("");
+  const [letter, setLetter] = useState<string | null>(null); // cover letter text shown in a popup
 
   /* ---------- Load data ---------- */
   const load = useCallback(async () => {
@@ -296,42 +290,37 @@ export default function ReportsPage() {
                   <th className="px-4 py-2.5 font-medium">{t("Applied Date")}</th>
                   <th className="px-4 py-2.5 font-medium">{t("CV")}</th>
                   <th className="px-4 py-2.5 font-medium">{t("Cover Letter")}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("Status")}</th>
                   <th className="px-4 py-2.5 font-medium">{t("Apply Link")}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-slate-400">{t("Loading...")}</td>
+                    <td colSpan={6} className="px-4 py-10 text-center text-slate-400">{t("Loading...")}</td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                    <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
                       {applications.length === 0 ? t("No applications yet.") : t("No applications match your filters.")}
                     </td>
                   </tr>
                 ) : (
                   filtered.map((r) => {
-                    const st = r.status.toLowerCase();
                     return (
                       <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                         <td className="px-4 py-3 font-semibold text-slate-800">{r.title || "—"}</td>
                         <td className="px-4 py-3 text-slate-600">{r.company || "—"}</td>
                         <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{fmtDate(r.appliedAt)}</td>
                         <td className="px-4 py-3"><ViewLink href={r.cvUrl} label={t("View")} /></td>
-                        <td className="px-4 py-3"><ViewLink href={r.coverLetterUrl} label={t("View")} /></td>
                         <td className="px-4 py-3">
-                          {r.status ? (
-                            <span
-                              className={`inline-block rounded-md px-2.5 py-1 text-xs font-medium ${
-                                STATUS_STYLES[st] ?? "bg-slate-200 text-slate-700"
-                              }`}
-                            >
-                              {t(r.status)}
-                            </span>
-                          ) : (
+                          {!r.coverLetterUrl ? (
                             <span className="text-slate-300">—</span>
+                          ) : /^https?:\/\//i.test(r.coverLetterUrl) ? (
+                            <ViewLink href={r.coverLetterUrl} label={t("View")} />
+                          ) : (
+                            <button type="button" onClick={() => setLetter(r.coverLetterUrl)} className="text-indigo-600 hover:underline">
+                              {t("View")}
+                            </button>
                           )}
                         </td>
                         <td className="px-4 py-3"><ViewLink href={r.url} label={t("View")} icon /></td>
@@ -408,6 +397,20 @@ export default function ReportsPage() {
           </div>
         </aside>
       </div>
+
+      {letter !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setLetter(null)}>
+          <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-800">{t("Cover Letter")}</h3>
+              <button type="button" onClick={() => setLetter(null)} className="text-sm text-slate-500 hover:text-slate-800">
+                {t("Close")}
+              </button>
+            </div>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{letter}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
