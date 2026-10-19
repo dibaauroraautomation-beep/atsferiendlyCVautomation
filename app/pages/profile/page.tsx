@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { useT } from "@/app/contexts/LanguageContext";
 import { buildCvPdf, photoToCircleDataUrl } from "@/lib/cvPdf";
+import { countText } from "@/lib/textCount";
 
 /* ------------------------------------------------------------------ */
 /* Placeholder data (replace later)                                    */
@@ -586,6 +587,7 @@ export default function ProfilePage() {
   const [coverLetter, setCoverLetter] = useState("");
   const [coverDraft, setCoverDraft] = useState("");
   const [coverEditing, setCoverEditing] = useState(false);
+  const [coverMax, setCoverMax] = useState(false); // card enlarged to a big window
   const [coverState, setCoverState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [coverMsg, setCoverMsg] = useState("");
   /* What n8n already has: nothing is sent when the data is unchanged. */
@@ -1136,48 +1138,69 @@ export default function ProfilePage() {
           )}
         </Card>
 
-        <Card className="mt-4 p-3">
-          <div className="mb-2 flex items-center justify-between">
+        {coverMax && <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setCoverMax(false)} />}
+        <Card className={coverMax ? "fixed left-1/2 top-1/2 z-50 max-h-[80vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto p-5 shadow-xl" : "mt-4 p-3"}>
+          <div className="mb-2 flex items-center justify-between gap-3">
             <h4 className="text-sm font-semibold text-slate-800">{t("Cover Letter")}</h4>
-            {coverEditing ? (
-              <div className="flex items-center gap-3 text-xs font-medium">
+            <div className="flex items-center gap-3 text-xs font-medium">
+              {!coverMax && (coverEditing ? coverDraft : coverLetter) && (
+                <span className="text-[11px] font-normal text-slate-400">{countText(coverEditing ? coverDraft : coverLetter)}</span>
+              )}
+              {coverEditing ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCoverEditing(false);
+                      setCoverState("idle");
+                    }}
+                    className="text-slate-500 hover:text-slate-700"
+                  >
+                    {t("Cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => saveCover(coverDraft.trim())}
+                    disabled={coverState === "saving"}
+                    className="text-indigo-600 hover:text-indigo-700 disabled:opacity-60"
+                  >
+                    {coverState === "saving" ? t("Saving...") : t("Done")}
+                  </button>
+                </>
+              ) : (
                 <button
                   type="button"
                   onClick={() => {
-                    setCoverEditing(false);
+                    setCoverDraft(coverLetter);
                     setCoverState("idle");
+                    setCoverEditing(true);
                   }}
-                  className="text-slate-500 hover:text-slate-700"
+                  className="text-slate-500 hover:text-indigo-600"
                 >
-                  {t("Cancel")}
+                  {t("Edit")}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => saveCover(coverDraft.trim())}
-                  disabled={coverState === "saving"}
-                  className="text-indigo-600 hover:text-indigo-700 disabled:opacity-60"
-                >
-                  {coverState === "saving" ? t("Saving...") : t("Done")}
-                </button>
-              </div>
-            ) : (
+              )}
               <button
                 type="button"
-                onClick={() => {
-                  setCoverDraft(coverLetter);
-                  setCoverState("idle");
-                  setCoverEditing(true);
-                }}
-                className="text-xs font-medium text-slate-500 hover:text-indigo-600"
+                onClick={() => setCoverMax((v) => !v)}
+                className="text-slate-400 hover:text-indigo-600"
+                aria-label={coverMax ? t("Minimize") : t("Maximize")}
+                title={coverMax ? t("Minimize") : t("Maximize")}
               >
-                {t("Edit")}
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  {coverMax ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+                  )}
+                </svg>
               </button>
-            )}
+            </div>
           </div>
 
           {coverEditing ? (
             <textarea
-              className={`${inputCls} min-h-[260px] resize-y leading-relaxed`}
+              className={`${inputCls} ${coverMax ? "min-h-[50vh]" : "min-h-[260px]"} resize-y leading-relaxed`}
               value={coverDraft}
               onChange={(e) => setCoverDraft(e.target.value)}
               aria-label={t("Cover Letter")}
@@ -1188,6 +1211,12 @@ export default function ProfilePage() {
             <p className="text-[13px] text-slate-400">
               {fetchState === "loading" ? t("Loading...") : t("Your cover letter will appear here once it is written.")}
             </p>
+          )}
+
+          {coverMax && (coverEditing ? coverDraft : coverLetter) && (
+            <div className="mt-4 flex justify-end border-t border-slate-400 pt-3 text-xs text-slate-500">
+              {countText(coverEditing ? coverDraft : coverLetter)}
+            </div>
           )}
 
           {coverState === "saved" && (

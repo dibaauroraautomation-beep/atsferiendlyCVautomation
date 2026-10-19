@@ -16,6 +16,7 @@ import { jsPDF } from "jspdf";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useT } from "@/app/contexts/LanguageContext";
 import type { ReportApplication, ReportResponse } from "@/lib/reports/types";
+import { countText } from "@/lib/textCount";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -408,6 +409,7 @@ export default function ReportsPage() {
               </button>
             </div>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{letter}</p>
+            <div className="mt-4 flex justify-end border-t border-slate-400 pt-3 text-xs text-slate-500">{countText(letter)}</div>
           </div>
         </div>
       )}
