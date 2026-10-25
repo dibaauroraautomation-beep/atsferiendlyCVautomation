@@ -1,9 +1,9 @@
 import { jsPDF } from 'jspdf';
 
-export function generateCoverLetterPDF() {
+export function generateCoverLetterPDF(text?: string) {
   // 1. Grab the actual text from the editable textarea
   const textarea = document.getElementById("AI-generated-text-area-editable") as HTMLTextAreaElement | null;
-  const content = textarea ? textarea.value : "";
+  const content = typeof text === "string" ? text : textarea ? textarea.value : "";
 
   if (!content) {
     alert("No content available to export!");

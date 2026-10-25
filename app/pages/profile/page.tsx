@@ -13,6 +13,8 @@ import type { ChangeEvent, ReactNode } from "react";
 import { useT } from "@/app/contexts/LanguageContext";
 import { buildCvPdf, photoToCircleDataUrl } from "@/lib/cvPdf";
 import { countText } from "@/lib/textCount";
+import { generateCoverLetterPDF } from "@/app/components/jsPDF";
+import { generateCoverLetterDocx } from "@/app/components/DocxGenerator";
 
 /* ------------------------------------------------------------------ */
 /* Placeholder data (replace later)                                    */
@@ -86,8 +88,8 @@ function rowToCv(row: CvRow, prev: CvData): CvData {
     /* keep the current personal info */
   }
   const pick = (v: unknown, sep: RegExp, fallback: string[]) => {
-    const a = lines(v, sep);
-    return a.length > 0 ? a : fallback;
+    if (v === undefined) return fallback; // the row has no such column: keep what is shown
+    return lines(v, sep); // saved empty = stays empty (no example text)
   };
   return {
     personal,
@@ -118,8 +120,6 @@ const PAGE_SIZES = {
 } as const;
 type PageSize = keyof typeof PAGE_SIZES;
 
-const CV_LANGUAGES = ["English", "Deutsch"];
-const LEVELS = ["Junior", "Mid", "Senior", "Lead"];
 
 const UPLOAD_CV_WEBHOOK = "https://n8naurora.duckdns.org/webhook/info-extract-upload-cv";
 /* ------------------------------------------------------------------ */
@@ -215,6 +215,10 @@ function EditField({
       ) : (
         <input
           type={type}
+          name={`profile-${label.replace(/\W+/g, "-").toLowerCase()}-field`}
+          autoComplete="off"
+          data-lpignore="true"
+          data-form-type="other"
           className={`${inputCls} mt-0.5`}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -534,6 +538,36 @@ function CvRendered({
   );
 }
 
+/* One row of the n8n "job data" table, read from the profile-cv-fetch response (row.jobs). */
+type JobRow = {
+  title: string;
+  company: string;
+  location: string;
+  matchScore: string;
+  skills: string;
+  description: string;
+  url: string;
+  cvUrl: string;
+  coverLetterUrl: string;
+};
+function toJobs(v: unknown): JobRow[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((r): r is Record<string, unknown> => !!r && typeof r === "object")
+    .map((r) => ({
+      title: str(r.jobtitle),
+      company: str(r.company),
+      location: str(r.location),
+      matchScore: typeof r.matchscore === "number" ? String(r.matchscore) : str(r.matchscore),
+      skills: str(r.skillrequired),
+      description: str(r.jd),
+      url: str(r.applylink),
+      cvUrl: str(r.CV_link),
+      coverLetterUrl: str(r.CoverLetter),
+    }))
+    .filter((j) => j.title);
+}
+
 /* The real preview of the uploaded file (pdf / image / text / other). */
 function CvFileView({ file, heightCls }: { file: CvFile; heightCls: string }) {
   const t = useT();
@@ -585,6 +619,41 @@ export default function ProfilePage() {
 
   /* Cover letter (column "cover_letter"): written by the AI agent in n8n when empty, editable here */
   const [coverLetter, setCoverLetter] = useState("");
+  /* Rows of the n8n "job data" table for this email (one per job). Picking a title shows that row. */
+  const [jobs, setJobs] = useState<JobRow[]>([]);
+  const [jobSel, setJobSel] = useState("");
+  const jobTitles = Array.from(new Set(jobs.map((j) => j.title).filter(Boolean)));
+  const selectedJob = jobSel ? jobs.find((j) => j.title === jobSel) : undefined;
+  const shownLetter = selectedJob ? selectedJob.coverLetterUrl : coverLetter;
+  const [jobLetterState, setJobLetterState] = useState<"idle" | "writing" | "error">("idle");
+  /* Picked a job without a cover letter: n8n writes it with AI, saves it and sends it back. */
+  const missingLetterFor = selectedJob && !selectedJob.coverLetterUrl ? selectedJob.title : "";
+  useEffect(() => {
+    if (!missingLetterFor) {
+      setJobLetterState("idle");
+      return;
+    }
+    let cancelled = false;
+    setJobLetterState("writing");
+    fetch("/api/profile-cv/cover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobtitle: missingLetterFor }),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || typeof data?.coverLetter !== "string" || !data.coverLetter) throw new Error("no letter");
+        if (cancelled) return;
+        setJobs((all) => all.map((j) => (j.title === missingLetterFor ? { ...j, coverLetterUrl: data.coverLetter } : j)));
+        setJobLetterState("idle");
+      })
+      .catch(() => {
+        if (!cancelled) setJobLetterState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [missingLetterFor]);
   const [coverDraft, setCoverDraft] = useState("");
   const [coverEditing, setCoverEditing] = useState(false);
   const [coverMax, setCoverMax] = useState(false); // card enlarged to a big window
@@ -594,7 +663,7 @@ export default function ProfilePage() {
   const baselineRef = useRef<string | null>(null);
   const snap = (p: Profile, c: CvData, letter: string) => JSON.stringify([p, c, letter, pageSize, photo]);
   const saveCover = async (text: string) => {
-    if (text === coverLetter) {
+    if (text === shownLetter) {
       setCoverEditing(false);
       setCoverState("idle");
       return;
@@ -602,7 +671,26 @@ export default function ProfilePage() {
     setCoverState("saving");
     setCoverMsg("");
     const ok = await sendCv(profile, cv, text);
-    if (ok) {
+    if (ok && selectedJob) {
+      const title = selectedJob.title;
+      setJobs((all) => all.map((j) => (j.title === title ? { ...j, coverLetterUrl: text } : j)));
+      setCoverEditing(false);
+      setCoverState("saved");
+    } else if (ok) {
+      // check the table really has the new letter (reads it back from n8n)
+      try {
+        await new Promise((r) => setTimeout(r, 1500));
+        const res = await fetch("/api/profile-cv/fetch", { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        const stored = str(data?.row?.cover_letter).replace(/\r\n/g, "\n").trim();
+        if (res.ok && data?.row && stored !== text.replace(/\r\n/g, "\n").trim()) {
+          setCoverMsg(t("n8n did not store the new letter. Check that the n8n workflow is published."));
+          setCoverState("error");
+          return;
+        }
+      } catch {
+        /* read-back failed: keep the normal result */
+      }
       setCoverLetter(text);
       setCoverEditing(false);
       setCoverState("saved");
@@ -634,6 +722,7 @@ export default function ProfilePage() {
       setProfile((p) => rowToProfile(row, p, email));
       setCv((c) => rowToCv(row, c));
       setCoverLetter(str(row.cover_letter));
+      setJobs(toJobs((row as Record<string, unknown>).jobs));
       setFetchState("loaded");
     } catch (err) {
       setFetchMsg(err instanceof Error ? err.message : "Something went wrong");
@@ -688,12 +777,20 @@ export default function ProfilePage() {
   /* ---- profile editing ---- */
   const startEdit = () => {
     setDraft(profile);
+    // never open the job dropdown empty: keep the picked job, else use the first one
+    if (!jobSel && jobTitles.length > 0) setJobSel(jobTitles[0]);
     setEditingProfile(true);
   };
   const saveEdit = () => {
     setProfile(draft);
     setEditingProfile(false);
-    sendCv(draft, cv); // Save also sends the complete CV
+    // keep the CV card's Name in sync with Full Name (preview and PDF use it)
+    const nameChanged = !!draft.fullName && draft.fullName !== profile.fullName;
+    const nextCv = nameChanged
+      ? { ...cv, personal: cv.personal.map((x) => (x.label === "Name" ? { ...x, value: draft.fullName } : x)) }
+      : cv;
+    if (nameChanged) setCv(nextCv);
+    sendCv(draft, nextCv); // Save also sends the complete CV
   };
   const cancelEdit = () => setEditingProfile(false);
   const setD = (k: keyof Profile) => (v: string) => setDraft((d) => ({ ...d, [k]: v }));
@@ -770,7 +867,7 @@ export default function ProfilePage() {
   };
   /* Build the full PDF from the given data and send it (with the user's email) to n8n. */
   const sendCv = async (p: Profile, c: CvData, coverOverride?: string): Promise<boolean> => {
-    const letterNow = coverOverride ?? coverLetter;
+    const letterNow = coverOverride ?? shownLetter;
     if (baselineRef.current !== null && baselineRef.current === snap(p, c, letterNow)) {
       setSendState("nochange");
       return true;
@@ -779,13 +876,15 @@ export default function ProfilePage() {
     setSendMsg("");
     try {
       const photoDataUrl = photo ? await photoToCircleDataUrl(photo) : null;
-      const blob = buildCvPdf({ profile: p, cv: c, photoDataUrl, page: PAGE_SIZES[pageSize] });
+      const blob = buildCvPdf({ profile: { ...p, targetJobs: selectedJob?.title || p.targetJobs }, cv: c, photoDataUrl, page: PAGE_SIZES[pageSize] });
       const cvName = c.personal.find((x) => x.label === "Name")?.value || p.fullName;
       const safeName = (cvName || "CV").trim().replace(/[^\w-]+/g, "_");
 
       const fd = new FormData();
       fd.append("cv", blob, `${safeName}_CV.pdf`);
-      fd.append("name", cvName);
+      // the name typed in Profile Information wins; the CV card name is only the fallback
+      const savedName = p.fullName && p.fullName !== PLACEHOLDER_PROFILE.fullName ? p.fullName : cvName;
+      fd.append("name", savedName);
       fd.append("email", p.email);
       fd.append("location", p.location);
       fd.append("targetJobs", p.targetJobs);
@@ -807,9 +906,12 @@ export default function ProfilePage() {
       fd.append("profile", JSON.stringify({ ...p, fullName: cvName }));
       fd.append("cvInfo", JSON.stringify(c));
       fd.append("pageSize", pageSize);
-      // saved/edited cover letter (only sent when there is one, so an empty value never blanks the cell)
-      const letter = coverOverride ?? coverLetter;
-      if (letter) fd.append("cover_letter", letter);
+      // cover letter: a manually written one always overwrites the saved one;
+      // other saves only resend the loaded letter (never an unloaded/empty value)
+      const letter = coverOverride ?? shownLetter;
+      if (coverOverride !== undefined || letter) fd.append("cover_letter", letter);
+      // n8n saves the letter and the CV link on this job (job data row) and names the PDF after it
+      fd.append("jobtitle", selectedJob?.title ?? "");
 
       const res = await fetch("/api/profile-cv", { method: "POST", body: fd });
       if (!res.ok) {
@@ -930,17 +1032,29 @@ export default function ProfilePage() {
                         label={t("Preferred CV Language")}
                         value={draft.cvLanguage}
                         onChange={setD("cvLanguage")}
-                        options={CV_LANGUAGES}
                       />
                       <EditField label={t("Location")} value={draft.location} onChange={setD("location")} />
                       <div className="col-span-2 sm:col-span-3">
-                        <EditField label={t("Target Job Titles")} value={draft.targetJobs} onChange={setD("targetJobs")} />
+                        <label className="block min-w-0">
+                          <span className="text-xs text-slate-500">{t("Target Job Titles")}</span>
+                          <select
+                            className={`${inputCls} mt-0.5`}
+                            value={jobSel}
+                            onChange={(e) => setJobSel(e.target.value)}
+                          >
+                            <option value="">{t("Select a job title")}</option>
+                            {jobTitles.map((o) => (
+                              <option key={o} value={o}>
+                                {o}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
                       </div>
                       <EditField
                         label={t("Experience Level")}
                         value={draft.experienceLevel}
                         onChange={setD("experienceLevel")}
-                        options={LEVELS}
                       />
                     </>
                   ) : (
@@ -948,11 +1062,56 @@ export default function ProfilePage() {
                       <Field label={t("Full Name")} value={profile.fullName} />
                       <Field label={t("Email")} value={profile.email} />
                       <Field label={t("Preferred CV Language")} value={profile.cvLanguage} />
-                      <Field label={t("Location")} value={profile.location} />
+                      <Field label={t("Location")} value={selectedJob?.location || profile.location} />
                       <div className="col-span-2 sm:col-span-3">
-                        <Field label={t("Target Job Titles")} value={profile.targetJobs} />
+                        <label className="block min-w-0">
+                          <span className="text-xs text-slate-500">{t("Target Job Titles")}</span>
+                          <select
+                            className={`${inputCls} mt-0.5`}
+                            value={jobSel}
+                            onChange={(e) => setJobSel(e.target.value)}
+                          >
+                            <option value="">{t("Select a job title")}</option>
+                            {jobTitles.map((o) => (
+                              <option key={o} value={o}>
+                                {o}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
                       </div>
                       <Field label={t("Experience Level")} value={profile.experienceLevel} />
+                      {selectedJob && (
+                        <>
+                          <Field label={t("Company")} value={selectedJob.company || "-"} />
+                          <Field label={t("Match Score")} value={selectedJob.matchScore || "-"} />
+                          <div className="min-w-0">
+                            <p className="text-xs text-slate-500">{t("Apply Link")}</p>
+                            {selectedJob.url ? (
+                              <a
+                                href={selectedJob.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-0.5 block truncate text-sm font-semibold text-indigo-600 hover:underline"
+                              >
+                                {selectedJob.url}
+                              </a>
+                            ) : (
+                              <p className="mt-0.5 text-sm font-semibold text-slate-800">-</p>
+                            )}
+                          </div>
+                          <div className="col-span-2 sm:col-span-3">
+                            <p className="text-xs text-slate-500">{t("Required Skills")}</p>
+                            <p className="mt-0.5 text-sm font-semibold text-slate-800">{selectedJob.skills || "-"}</p>
+                          </div>
+                          <div className="col-span-2 sm:col-span-3">
+                            <p className="text-xs text-slate-500">{t("Job Description")}</p>
+                            <p className="mt-0.5 line-clamp-3 whitespace-pre-wrap text-sm text-slate-700">
+                              {selectedJob.description || "-"}
+                            </p>
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
@@ -988,8 +1147,12 @@ export default function ProfilePage() {
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => cvFile && window.open(cvFile.url, "_blank")}
-                        disabled={!cvFile}
+                        onClick={() => {
+                          const jobCv = selectedJob && /^https?:\/\//i.test(selectedJob.cvUrl) ? selectedJob.cvUrl : "";
+                          if (jobCv) window.open(jobCv, "_blank");
+                          else if (cvFile) window.open(cvFile.url, "_blank");
+                        }}
+                        disabled={!cvFile && !(selectedJob && /^https?:\/\//i.test(selectedJob.cvUrl))}
                         className="rounded-md border border-slate-300 bg-white px-3.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {t("View CV")}
@@ -1133,19 +1296,21 @@ export default function ProfilePage() {
             <CvFileView file={cvFile} heightCls={previewHeight} />
           ) : (
             <div>
-              <CvRendered profile={profile} cv={cv} photo={photo} large={previewMax} pageSize={pageSize} />
+              <CvRendered profile={{ ...profile, targetJobs: selectedJob?.title || profile.targetJobs }} cv={cv} photo={photo} large={previewMax} pageSize={pageSize} />
             </div>
           )}
         </Card>
 
         {coverMax && <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setCoverMax(false)} />}
         <Card className={coverMax ? "fixed left-1/2 top-1/2 z-50 max-h-[80vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto p-5 shadow-xl" : "mt-4 p-3"}>
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <h4 className="text-sm font-semibold text-slate-800">{t("Cover Letter")}</h4>
-            <div className="flex items-center gap-3 text-xs font-medium">
-              {!coverMax && (coverEditing ? coverDraft : coverLetter) && (
-                <span className="text-[11px] font-normal text-slate-400">{countText(coverEditing ? coverDraft : coverLetter)}</span>
+          <div className="mb-2 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h4 className="whitespace-nowrap text-sm font-semibold text-slate-800">{t("Cover Letter")}</h4>
+              {!coverMax && (coverEditing ? coverDraft : shownLetter) && (
+                <p className="mt-0.5 text-[11px] font-normal text-slate-400">{countText(coverEditing ? coverDraft : shownLetter)}</p>
               )}
+            </div>
+            <div className="flex shrink-0 items-center gap-3 whitespace-nowrap text-xs font-medium">
               {coverEditing ? (
                 <>
                   <button
@@ -1167,11 +1332,11 @@ export default function ProfilePage() {
                     {coverState === "saving" ? t("Saving...") : t("Done")}
                   </button>
                 </>
-              ) : (
+              ) : !selectedJob ? null : (
                 <button
                   type="button"
                   onClick={() => {
-                    setCoverDraft(coverLetter);
+                    setCoverDraft(shownLetter);
                     setCoverState("idle");
                     setCoverEditing(true);
                   }}
@@ -1179,6 +1344,28 @@ export default function ProfilePage() {
                 >
                   {t("Edit")}
                 </button>
+              )}
+              {!coverEditing && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => generateCoverLetterDocx(shownLetter)}
+                    disabled={!shownLetter}
+                    className="text-slate-500 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-slate-500"
+                    title={t("Download DOCX")}
+                  >
+                    DOCX
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => generateCoverLetterPDF(shownLetter)}
+                    disabled={!shownLetter}
+                    className="text-slate-500 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-slate-500"
+                    title={t("Download PDF")}
+                  >
+                    PDF
+                  </button>
+                </>
               )}
               <button
                 type="button"
@@ -1200,22 +1387,30 @@ export default function ProfilePage() {
 
           {coverEditing ? (
             <textarea
-              className={`${inputCls} ${coverMax ? "min-h-[50vh]" : "min-h-[260px]"} resize-y leading-relaxed`}
+              className={`${inputCls} ${coverMax ? "min-h-[50vh]" : "min-h-[260px] max-h-[26rem]"} resize-y leading-relaxed`}
               value={coverDraft}
               onChange={(e) => setCoverDraft(e.target.value)}
               aria-label={t("Cover Letter")}
             />
-          ) : coverLetter ? (
-            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-600">{coverLetter}</p>
+          ) : shownLetter ? (
+            <p className={`whitespace-pre-wrap text-[13px] leading-relaxed text-slate-600 ${coverMax ? "" : "max-h-[26rem] overflow-y-auto pr-1"}`}>{shownLetter}</p>
           ) : (
             <p className="text-[13px] text-slate-400">
-              {fetchState === "loading" ? t("Loading...") : t("Your cover letter will appear here once it is written.")}
+              {selectedJob
+                ? jobLetterState === "writing"
+                  ? t("Writing your cover letter...")
+                  : jobLetterState === "error"
+                    ? t("Could not write the cover letter. Please try again.")
+                    : t("Your cover letter will appear here once it is written.")
+                : fetchState === "loading"
+                  ? t("Loading...")
+                  : t("Pick a job title to see or edit its cover letter.")}
             </p>
           )}
 
-          {coverMax && (coverEditing ? coverDraft : coverLetter) && (
+          {coverMax && (coverEditing ? coverDraft : shownLetter) && (
             <div className="mt-4 flex justify-end border-t border-slate-400 pt-3 text-xs text-slate-500">
-              {countText(coverEditing ? coverDraft : coverLetter)}
+              {countText(coverEditing ? coverDraft : shownLetter)}
             </div>
           )}
 

@@ -4,11 +4,8 @@
   Applications & Reports page  (/pages/reports)
   Title + description come from pageConfig.ts (shared layout).
 
-  Data: GET /api/reports  (server route, one JSON shape)
-  - Route A: Supabase table "user_documents"  (types: application, job, resume, cover_letter)
-  - Route B: n8n workflow "getJobReport" (reads the n8n data table)
-  REPORTS_SOURCE in .env.local picks which one is tried first; if it fails the other one is
-  used automatically and `fallback: true` is returned (a small notice is shown below).
+  Data: rows come from the n8n report webhook, then only the jobs this user applied to
+  (Supabase table "user_documents", type "application") are kept. See lib/reports/verifiedSource.ts.
 */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -16,12 +13,14 @@ import { jsPDF } from "jspdf";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useT } from "@/app/contexts/LanguageContext";
 import type { ReportApplication, ReportResponse } from "@/lib/reports/types";
+import { buildReport, fetchReportRows, toAppliedMap, type AppliedInfo } from "@/lib/reports/verifiedSource";
+import { createClient } from "@/lib/supabase/client";
 import { countText } from "@/lib/textCount";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
-const STATUSES = ["Applied", "Pending", "Interview", "Rejected", "Offer"];
+const STATUSES = ["Applied", "Pending", "Interview", "Rejected", "Offer", "Not applied"];
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 // "YYYY-MM-DD" -> Date at UTC midnight (so the day never shifts with the browser time zone)
@@ -137,17 +136,36 @@ export default function ReportsPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/reports", { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setReport((await res.json()) as ReportResponse);
+      const supabase = createClient();
+      // n8n rows and the user's applications are loaded at the same time (like the Jobs page)
+      const [rowsResult, appsRes] = await Promise.all([
+        fetchReportRows(user?.email ?? undefined).then(
+          (data) => ({ data, error: null as string | null }),
+          (err: Error) => ({ data: null, error: err.message })
+        ),
+        supabase.from("user_documents").select("content").eq("type", "application"),
+      ]);
+
+      if (rowsResult.error || !rowsResult.data) {
+        console.error("Report load failed:", rowsResult.error);
+        setError(rowsResult.error ?? "Could not load your reports right now. Try again.");
+        return;
+      }
+
+      // Applied marks are optional: a failure here never blocks the page
+      let applied = new Map<string, AppliedInfo>();
+      if (appsRes.error) console.warn("Applications load failed:", appsRes.error);
+      else applied = toAppliedMap((appsRes.data ?? []) as { content: Record<string, unknown> | null }[]);
+
+      setReport({ ...buildReport(rowsResult.data, applied), source: "n8n", fallback: false });
     } catch (e) {
-      console.error(e);
-      setError(t("Could not load your reports. Refresh the page to try again."));
+      console.error("Report load crashed:", e);
+      setError("Could not load your reports right now. Try again.");
     } finally {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.email]);
 
   useEffect(() => {
     if (user) load();
@@ -248,9 +266,9 @@ export default function ReportsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start lg:items-stretch">
         {/* ================= LEFT: Applications ================= */}
-        <section className={`space-y-4 ${tab === "applications" ? "" : "hidden lg:block"}`}>
+        <section className={`flex-col gap-4 ${tab === "applications" ? "flex" : "hidden lg:flex"}`}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatCard label={t("Total Applications")} value={stats.total} />
             <StatCard label={t("This Week")} value={stats.thisWeek} />
@@ -282,16 +300,32 @@ export default function ReportsPage() {
             />
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
+          {/* Small screens: fixed height. Large screens: fills the space down to the end of the right-hand cards. */}
+          <div className="relative h-[70vh] lg:h-auto lg:flex-1 lg:min-h-[16rem]">
+          <div className="absolute inset-0 flex flex-col rounded-xl border border-slate-200 bg-white overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+              <p className="text-sm text-slate-700">
+                {loading ? t("Loading...") : `${filtered.length} ${filtered.length === 1 ? "row" : "rows"}`}
+              </p>
+              <button
+                onClick={load}
+                disabled={loading}
+                className="text-sm text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-50"
+              >
+                {t("Refresh")}
+              </button>
+            </div>
+            {/* The table scrolls inside this box and the header stays visible */}
+            <div className="flex-1 min-h-0 overflow-auto overscroll-contain">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-slate-600 border-b border-slate-100">
-                  <th className="px-4 py-2.5 font-medium">{t("Job Title")}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("Company")}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("Applied Date")}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("CV")}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("Cover Letter")}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("Apply Link")}</th>
+                <tr className="text-left text-slate-600">
+                  <th className="sticky top-0 z-10 bg-slate-50 px-4 py-2.5 font-medium">{t("Job Title")}</th>
+                  <th className="sticky top-0 z-10 bg-slate-50 px-4 py-2.5 font-medium">{t("Company")}</th>
+                  <th className="sticky top-0 z-10 bg-slate-50 px-4 py-2.5 font-medium">{t("Applied Date")}</th>
+                  <th className="sticky top-0 z-10 bg-slate-50 px-4 py-2.5 font-medium">{t("CV")}</th>
+                  <th className="sticky top-0 z-10 bg-slate-50 px-4 py-2.5 font-medium">{t("Cover Letter")}</th>
+                  <th className="sticky top-0 z-10 bg-slate-50 px-4 py-2.5 font-medium">{t("Apply Link")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -312,7 +346,13 @@ export default function ReportsPage() {
                         <td className="px-4 py-3 font-semibold text-slate-800">{r.title || "—"}</td>
                         <td className="px-4 py-3 text-slate-600">{r.company || "—"}</td>
                         <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{fmtDate(r.appliedAt)}</td>
-                        <td className="px-4 py-3"><ViewLink href={r.cvUrl} label={t("View")} /></td>
+                        <td className="px-4 py-3">
+                          {r.cvUrl && !/^https?:\/\//i.test(r.cvUrl) ? (
+                            <span className="break-all text-slate-600">{r.cvUrl}</span>
+                          ) : (
+                            <ViewLink href={r.cvUrl} label={t("View")} />
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           {!r.coverLetterUrl ? (
                             <span className="text-slate-300">—</span>
@@ -331,11 +371,13 @@ export default function ReportsPage() {
                 )}
               </tbody>
             </table>
+            </div>
+          </div>
           </div>
         </section>
 
         {/* ================= RIGHT: Weekly report ================= */}
-        <aside className={`space-y-4 ${tab === "weekly" ? "" : "hidden lg:block"}`}>
+        <aside className={`space-y-4 lg:self-start ${tab === "weekly" ? "" : "hidden lg:block"}`}>
           <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
             <div>
               <h2 className="text-lg font-bold text-slate-900">{t("Weekly Job Search Report")}</h2>

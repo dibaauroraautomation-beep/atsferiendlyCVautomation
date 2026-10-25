@@ -1,11 +1,11 @@
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from 'docx';
 import { saveAs } from 'file-saver';
 
-export function generateCoverLetterDocx() {
+export function generateCoverLetterDocx(text?: string) {
  // 1. Grab the text from the editable textarea (Cast as HTMLTextAreaElement)
   const textarea = document.getElementById("AI-generated-text-area-editable") as HTMLTextAreaElement | null;
   
-  const content = textarea ? textarea.value : "";
+  const content = typeof text === "string" ? text : textarea ? textarea.value : "";
 
   if (!content) {
     alert("No content available to export!");
