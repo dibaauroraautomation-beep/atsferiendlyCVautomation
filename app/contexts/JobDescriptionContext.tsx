@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
-import { useUser } from "./UserContext";
+import { useAuth } from "./AuthContext";
 
 type JobDescriptionContextType = {
   resumeJobDescription: string;
@@ -18,23 +18,31 @@ export function JobDescriptionProvider({ children }: { children: ReactNode }) {
   const [resumeJobDescription, setResumeJobDescription] = useState("");
   const [interviewJobDescription, setInterviewJobDescription] = useState("");
   const [coverLetterJobDescription, setCoverLetterJobDescription] = useState("");
-  const { user } = useUser();
+  // const { user } = useUser();
 
-  // Load from localStorage on mount
+  // // Load from localStorage on mount
+  // useEffect(() => {
+  //   if (typeof window !== "undefined") {
+  //     const userEmail = localStorage.getItem("userEmail");
+  //     if (userEmail) {
+  //       const storedResume = localStorage.getItem(`jobDesc_resume_${userEmail}`);
+  //       const storedInterview = localStorage.getItem(`jobDesc_interview_${userEmail}`);
+  //       const storedCoverLetter = localStorage.getItem(`jobDesc_coverLetter_${userEmail}`);
+
+  //       if (storedResume) setResumeJobDescription(storedResume);
+  //       if (storedInterview) setInterviewJobDescription(storedInterview);
+  //       if (storedCoverLetter) setCoverLetterJobDescription(storedCoverLetter);
+  //     }
+  //   }
+  // }, []);
+  const { user } = useAuth();
+  const key = user?.id;
+
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const userEmail = localStorage.getItem("userEmail");
-      if (userEmail) {
-        const storedResume = localStorage.getItem(`jobDesc_resume_${userEmail}`);
-        const storedInterview = localStorage.getItem(`jobDesc_interview_${userEmail}`);
-        const storedCoverLetter = localStorage.getItem(`jobDesc_coverLetter_${userEmail}`);
-        
-        if (storedResume) setResumeJobDescription(storedResume);
-        if (storedInterview) setInterviewJobDescription(storedInterview);
-        if (storedCoverLetter) setCoverLetterJobDescription(storedCoverLetter);
-      }
-    }
-  }, []);
+    setResumeJobDescription(key ? localStorage.getItem(`jobDesc_resume_${key}`) ?? "" : "");
+    setInterviewJobDescription(key ? localStorage.getItem(`jobDesc_interview_${key}`) ?? "" : "");
+    setCoverLetterJobDescription(key ? localStorage.getItem(`jobDesc_coverLetter_${key}`) ?? "" : "");
+  }, [key]);
 
   // Save to localStorage whenever they change
   useEffect(() => {

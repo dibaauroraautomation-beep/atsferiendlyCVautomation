@@ -11,7 +11,8 @@ import { createClient } from "@/lib/supabase/client";
 /* Config                                                              */
 /* ------------------------------------------------------------------ */
 // n8n webhook that returns the rows of the "job data" table
-const JOBS_WEBHOOK_URL = "https://n8naurora.duckdns.org/webhook/job-data";
+// const JOBS_WEBHOOK_URL = "https://n8naurora.duckdns.org/webhook/job-data";
+const JOBS_WEBHOOK_URL = "/api/jobs";
 // A job counts as "matching" when its match score is at least this value.
 const MATCH_THRESHOLD = 70;
 // Write the same schedule you set on the n8n Schedule Trigger.
@@ -278,19 +279,39 @@ export default function AutomaticDashboardPage() {
 
   /* ---------- Jobs from the n8n webhook ---------- */
   const loadJobs = useCallback(async () => {
-    try {
-      const res = await fetch(JOBS_WEBHOOK_URL, { cache: "no-store" });
-      if (!res.ok) throw new Error(`Webhook responded with ${res.status}`);
-      const payload = await res.json();
-      setJobs(extractRows(payload).map(normalizeJob));
-      setJobsError("");
-    } catch (err) {
-      console.error("Job webhook failed:", err);
-      setJobs([]);
-      setJobsError("Could not load jobs from the job search service. Check that the n8n workflow is active.");
-    }
-  }, []);
+    if (!user) return;
+    const { data, error } = await supabase
+      .from("job_matches")
+      .select("match_score, created_at, jobs ( id, title, company, location, url )")
+      .eq("user_id", user.id)
+      .order("match_score", { ascending: false });
 
+    if (error) {
+      console.error("job_matches load failed:", error);
+      setJobs([]);
+      setJobsError("Could not load your matched jobs.");
+      return;
+    }
+
+    setJobs(
+      (data ?? []).map((m: any, i: number) =>
+        normalizeJob(
+          {
+            id: m.jobs?.id,
+            jobtitle: m.jobs?.title,
+            company: m.jobs?.company,
+            location: m.jobs?.location,
+            matchscore: m.match_score,
+            applylink: m.jobs?.url,
+            createdAt: m.created_at,
+          },
+          i
+        )
+      )
+    );
+    setJobsError("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
   /* ---------- CV + application counts from Supabase ---------- */
   const loadCounts = useCallback(async () => {
     try {
@@ -555,14 +576,12 @@ export default function AutomaticDashboardPage() {
             </h3>
             <div className="p-5 space-y-3">
               <div
-                className={`flex items-center gap-3 p-3 rounded-lg ${
-                  automationActive ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"
-                }`}
+                className={`flex items-center gap-3 p-3 rounded-lg ${automationActive ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"
+                  }`}
               >
                 <span
-                  className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-white ${
-                    automationActive ? "bg-emerald-500" : "bg-amber-500"
-                  }`}
+                  className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-white ${automationActive ? "bg-emerald-500" : "bg-amber-500"
+                    }`}
                 >
                   <Icon d={ICONS.check} className="w-4 h-4" />
                 </span>

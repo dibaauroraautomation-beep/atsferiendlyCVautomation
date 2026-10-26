@@ -1,8 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
-
-
+import { createContext, useContext, useMemo, useState, ReactNode } from "react";
+import { useAuth } from "./AuthContext";
 
 export type User = {
   id: string;
@@ -18,36 +17,41 @@ type UserContextType = {
   setUser: (user: User) => void;
 };
 
-const defaultUser: User = {
-  id: "user-default-001",
-  name: "Alex Morgan",
-  profilePic: "https://i.pravatar.cc/64?img=12",
-  notificationNumber: 5,
-  purchasePlan: "Premium Pro",
-  WebHook_Url: {
-    Dashboard: "WebHook_Url:Dashboardopoopop",
-    Resume_Generator: "WebHook_Url:Resume_Generatoropoopop",
-    coverLetterGenerator: "WebHook_Url:coverLetterGeneratoropoopop",
-    Interview_Prep_AI: "WebHook_Url:Interview_Prep_AIopoopop",
-    ApplicationsStatus: "WebHook_Url:ApplicationsStatusopoopop",
-    setting: "WebHook_Url:settingopoopop",
-  }
+const WEBHOOKS: Record<string, string> = {
+  Resume_Generator: "https://n8naurora.duckdns.org/webhook/user-info",
+  coverLetterGenerator: "https://n8naurora.duckdns.org/webhook/coverLetterGenerator",
+  ApplicationsStatus: "https://n8naurora.duckdns.org/webhook/ApplicationsStatus",
 };
 
-const UserContext = createContext<UserContextType>({
-  user: defaultUser,
-  setUser: () => {},
-});
+const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User>(defaultUser);
+  const { user: authUser, profile } = useAuth();
+  const [extra, setExtra] = useState<Partial<User>>({});
+
+  const user = useMemo<User>(() => {
+    const name =
+      [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "User";
+    return {
+      id: authUser?.id ?? "",          // real Supabase user id
+      name,
+      profilePic: authUser?.user_metadata?.avatar_url ?? "",
+      notificationNumber: 0,
+      purchasePlan: "",
+      WebHook_Url: WEBHOOKS,
+      ...extra,
+    };
+  }, [authUser, profile, extra]);
+
   return (
-    <UserContext.Provider value={{ user, setUser }}>
+    <UserContext.Provider value={{ user, setUser: (u) => setExtra(u) }}>
       {children}
     </UserContext.Provider>
   );
 }
 
 export function useUser() {
-  return useContext(UserContext);
+  const ctx = useContext(UserContext);
+  if (!ctx) throw new Error("useUser must be used inside <UserProvider>");
+  return ctx;
 }

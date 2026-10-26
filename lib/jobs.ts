@@ -3,8 +3,11 @@
 /* Place this file at: lib/jobs.ts                                      */
 /* ------------------------------------------------------------------ */
 
-export const JOBS_WEBHOOK_URL =
-  process.env.NEXT_PUBLIC_JOBS_WEBHOOK_URL || "https://n8naurora.duckdns.org/webhook/job-data";
+import page from "@/app/pages/reports/page";
+
+// export const JOBS_WEBHOOK_URL =
+//   process.env.NEXT_PUBLIC_JOBS_WEBHOOK_URL || "https://n8naurora.duckdns.org/webhook/job-data";
+export const JOBS_WEBHOOK_URL = "/api/jobs";
 
 export const NOT_AVAILABLE = "Not available";
 
