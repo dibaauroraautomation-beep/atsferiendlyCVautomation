@@ -3,7 +3,8 @@
 /* Place this file at: lib/jobs.ts                                      */
 /* ------------------------------------------------------------------ */
 
-import page from "@/app/pages/reports/page";
+// import page from "@/app/pages/reports/page";
+import { createClient } from "@/lib/supabase/client";
 
 // export const JOBS_WEBHOOK_URL =
 //   process.env.NEXT_PUBLIC_JOBS_WEBHOOK_URL || "https://n8naurora.duckdns.org/webhook/job-data";
@@ -98,46 +99,42 @@ export const normalizeJob = (row: RawRow, index: number): Job => {
 };
 
 /** Calls the n8n webhook and returns clean jobs. Throws an Error with a user-friendly message. */
-export async function fetchJobs(accessToken?: string): Promise<Job[]> {
-  let res: Response;
-  try {
-    res = await fetch(JOBS_WEBHOOK_URL, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-      cache: "no-store",
-    });
-  } catch {
-    // Browsers report CORS blocks and offline errors the same way, so the message covers both
-    console.error(
-      `Request to ${JOBS_WEBHOOK_URL} failed. Check: 1) the n8n workflow is published/active, ` +
-      `2) the Webhook node's Allowed Origins includes ${typeof window !== "undefined" ? window.location.origin : "this site"}.`
-    );
-    throw new Error("Could not reach the job service. Check your connection and try again.");
+/** Loads the logged-in user's jobs from Supabase "job_matches". RLS makes sure each user sees only their own rows. */
+export async function fetchJobs(): Promise<Job[]> {
+  const supabase = createClient();
+
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) throw new Error("Your session has expired. Please sign in again.");
+
+  const { data, error } = await supabase
+    .from("job_matches")
+    .select("job_id, title, company, location, apply_url, match_score, cv, coverletter, created_at")
+    .eq("user_id", user.id)
+    .order("match_score", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("job_matches load failed:", error);
+    throw new Error("Could not load your jobs right now. Try again.");
   }
 
-  if (res.status === 401 || res.status === 403) throw new Error("Your session has expired. Please sign in again.");
-  if (res.status === 404) {
-    console.error("n8n returned 404: the workflow with this webhook is not published/active.");
-    throw new Error("The job service is not active right now. Try again later.");
-  }
-  if (!res.ok) throw new Error(`The job service returned an error (${res.status}). Try again later.`);
-
-  const text = await res.text();
-  if (!text.trim()) return []; // n8n returned an empty body = no jobs
-
-  let payload: unknown;
-  try {
-    payload = JSON.parse(text);
-  } catch {
-    throw new Error("The job service sent data in an unexpected format.");
-  }
-
-  // Drop rows that have no useful information at all
-  return extractRows(payload)
-    .map(normalizeJob)
+  return (data ?? [])
+    .map((m: RawRow, i: number) =>
+      normalizeJob(
+        {
+          id: m.job_id,
+          jobtitle: m.title,
+          company: m.company,
+          location: m.location,
+          matchscore: m.match_score,
+          applylink: m.apply_url,
+          cvlink: m.cv,
+          coverletterlink: m.coverletter,
+        },
+        i
+      )
+    )
     .filter((j) => j.jobTitle || j.company || j.location || j.applyLink);
 }
 

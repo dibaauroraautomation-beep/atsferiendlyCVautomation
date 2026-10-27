@@ -278,13 +278,14 @@ export default function AutomaticDashboardPage() {
   }, [profile, user]);
 
   /* ---------- Jobs from the n8n webhook ---------- */
-  const loadJobs = useCallback(async () => {
+    const loadJobs = useCallback(async () => {
     if (!user) return;
     const { data, error } = await supabase
       .from("job_matches")
-      .select("match_score, created_at, jobs ( id, title, company, location, url )")
+      .select("job_id, title, company, location, apply_url, employment_type, salary, match_score, created_at")
       .eq("user_id", user.id)
-      .order("match_score", { ascending: false });
+      .order("match_score", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error("job_matches load failed:", error);
@@ -297,12 +298,12 @@ export default function AutomaticDashboardPage() {
       (data ?? []).map((m: any, i: number) =>
         normalizeJob(
           {
-            id: m.jobs?.id,
-            jobtitle: m.jobs?.title,
-            company: m.jobs?.company,
-            location: m.jobs?.location,
+            id: m.job_id,
+            jobtitle: m.title,
+            company: m.company,
+            location: m.location,
             matchscore: m.match_score,
-            applylink: m.jobs?.url,
+            applylink: m.apply_url,
             createdAt: m.created_at,
           },
           i
