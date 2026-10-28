@@ -7,14 +7,17 @@ export async function POST(req: Request) {
   const webhook = "https://n8naurora.duckdns.org/webhook/profile-cover-letter";
 
   let email = "";
+  let userId = "";
   try {
     const supabase = await createServerSupabase();
     const { data } = await supabase.auth.getUser();
     email = data.user?.email ?? "";
+    userId = data.user?.id ?? "";
   } catch {
     email = "";
+    userId = "";
   }
-  if (!email) return Response.json({ error: "Not signed in" }, { status: 401 });
+  if (!email || !userId) return Response.json({ error: "Not signed in" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
   const jobtitle = typeof body?.jobtitle === "string" ? body.jobtitle.trim() : "";
@@ -24,7 +27,7 @@ export async function POST(req: Request) {
     const res = await fetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, jobtitle }),
+      body: JSON.stringify({ email, user_id: userId, jobtitle }),
       cache: "no-store",
       signal: AbortSignal.timeout(90_000),
     });

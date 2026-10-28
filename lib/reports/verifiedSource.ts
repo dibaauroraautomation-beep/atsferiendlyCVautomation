@@ -11,13 +11,13 @@ type ReportRows = Pick<ReportData, "applications" | "weekly">;
 const key = (v: unknown) => String(v ?? "").trim().toLowerCase();
 
 /** Calls the n8n webhook. Throws an Error with a user-friendly message. */
-export async function fetchReportRows(email?: string): Promise<ReportRows> {
+export async function fetchReportRows(userId?: string, email?: string): Promise<ReportRows> {
   let res: Response;
   try {
     // Simple form POST (no custom headers), so the browser needs no CORS preflight
     res = await fetch(REPORTS_WEBHOOK_URL, {
       method: "POST",
-      body: new URLSearchParams({ email: email ?? "" }),
+      body: new URLSearchParams({ user_id: userId ?? "", email: email ?? "" }),
       cache: "no-store",
     });
   } catch {

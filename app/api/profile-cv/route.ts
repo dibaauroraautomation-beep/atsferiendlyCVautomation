@@ -18,6 +18,8 @@ export async function POST(request: NextRequest) {
     formData.set("user_email", "");
     formData.set("user_id", "");
   }
+  // rows and the Drive folder in n8n are keyed by the UUID, so a save without a user is refused
+  if (!formData.get("user_id")) return Response.json({ error: "Not signed in" }, { status: 401 });
 
   try {
     const res = await fetch(webhook, {

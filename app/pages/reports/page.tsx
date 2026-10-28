@@ -139,7 +139,7 @@ export default function ReportsPage() {
       const supabase = createClient();
       // n8n rows and the user's applications are loaded at the same time (like the Jobs page)
       const [rowsResult, appsRes] = await Promise.all([
-        fetchReportRows(user?.email ?? undefined).then(
+        fetchReportRows(user?.id, user?.email ?? undefined).then(
           (data) => ({ data, error: null as string | null }),
           (err: Error) => ({ data: null, error: err.message })
         ),
@@ -165,7 +165,7 @@ export default function ReportsPage() {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.email]);
+  }, [user?.id, user?.email]);
 
   useEffect(() => {
     if (user) load();

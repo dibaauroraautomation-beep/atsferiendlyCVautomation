@@ -65,7 +65,7 @@ function rowToProfile(row: CvRow, prev: Profile, email: string): Profile {
   return {
     ...prev,
     fullName: str(row.name) || prev.fullName,
-    email: str(row.email) || email || prev.email,
+    email: email || prev.email, // the table's email column now holds the user's UUID, so use the login email
     cvLanguage: str(row.cvLanguage) || prev.cvLanguage,
     location: str(row.location) || prev.location,
     targetJobs: str(row.targetjob) || prev.targetJobs,

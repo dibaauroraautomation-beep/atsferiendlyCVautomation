@@ -8,14 +8,17 @@ export async function GET() {
   // const webhook = "https://n8naurora.duckdns.org/webhook-test/profile-cv-fetch";
   // Who is asking: taken from the logged-in Supabase session (cannot be faked by the browser).
   let email = "";
+  let userId = "";
   try {
     const supabase = await createServerSupabase();
     const { data } = await supabase.auth.getUser();
     email = data.user?.email ?? "";
+    userId = data.user?.id ?? "";
   } catch {
     email = "";
+    userId = "";
   }
-  if (!email) {
+  if (!email || !userId) {
     return Response.json({ error: "Not signed in" }, { status: 401 });
   }
 
@@ -23,7 +26,7 @@ export async function GET() {
     const res = await fetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, user_id: userId }),
       cache: "no-store",
       signal: AbortSignal.timeout(30_000),
     });
@@ -38,7 +41,7 @@ export async function GET() {
     } catch {
       row = null;
     }
-    // an empty object means no row was found for this email
+    // an empty object means no row was found for this user (matched by UUID)
     if (row && Object.keys(row).length === 0) row = null;
     return Response.json({ email, row });
   } catch {
