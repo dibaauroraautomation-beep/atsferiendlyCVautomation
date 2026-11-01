@@ -121,7 +121,8 @@ const PAGE_SIZES = {
 type PageSize = keyof typeof PAGE_SIZES;
 
 
-const UPLOAD_CV_WEBHOOK = "https://n8naurora.duckdns.org/webhook/info-extract-upload-cv";
+// const UPLOAD_CV_WEBHOOK = "https://n8naurora.duckdns.org/webhook/info-extract-upload-cv";
+const UPLOAD_CV_WEBHOOK = "/api/profile-cv/upload";
 /* ------------------------------------------------------------------ */
 /* Icons                                                               */
 /* ------------------------------------------------------------------ */
