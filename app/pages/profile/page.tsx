@@ -541,6 +541,7 @@ function CvRendered({
 
 /* One row of the n8n "job data" table, read from the profile-cv-fetch response (row.jobs). */
 type JobRow = {
+  id: string;
   title: string;
   company: string;
   location: string;
@@ -551,20 +552,41 @@ type JobRow = {
   cvUrl: string;
   coverLetterUrl: string;
 };
-function toJobs(v: unknown): JobRow[] {
+/* targetjob holds several job names in one text. Split on comma, new line, "|" or ";" -> one dropdown option each. */
+function splitTargets(v: string): string[] {
+  return Array.from(new Set(v.split(/[\n|;,]/).map((x) => x.trim()).filter(Boolean)));
+}
+function toJobs(input: unknown): JobRow[] {
+  let v = input;
+  if (typeof v === "string") {
+    try {
+      v = JSON.parse(v);
+    } catch {
+      return [];
+    }
+  }
   if (!Array.isArray(v)) return [];
+  // accept both naming styles (old n8n job table: jobtitle/CoverLetter, Supabase job_matches: title/coverletter)
+  const pick = (r: Record<string, unknown>, ...keys: string[]) => {
+    for (const k of keys) {
+      const x = r[k];
+      if (x !== undefined && x !== null && String(x).trim() !== "") return typeof x === "number" ? String(x) : str(x);
+    }
+    return "";
+  };
   return v
     .filter((r): r is Record<string, unknown> => !!r && typeof r === "object")
     .map((r) => ({
-      title: str(r.jobtitle),
-      company: str(r.company),
-      location: str(r.location),
-      matchScore: typeof r.matchscore === "number" ? String(r.matchscore) : str(r.matchscore),
-      skills: str(r.skillrequired),
-      description: str(r.jd),
-      url: str(r.applylink),
-      cvUrl: str(r.CV_link),
-      coverLetterUrl: str(r.CoverLetter),
+      id: String(r.id ?? ""),
+      title: pick(r, "jobtitle", "title", "job_title"),
+      company: pick(r, "company"),
+      location: pick(r, "location"),
+      matchScore: pick(r, "matchscore", "match_score", "score"),
+      skills: pick(r, "skillrequired", "skills", "skill"),
+      description: pick(r, "jd", "description"),
+      url: pick(r, "applylink", "url", "link"),
+      cvUrl: pick(r, "CV_link", "cv_link", "cvlink"),
+      coverLetterUrl: pick(r, "CoverLetter", "coverletter", "cover_letter"),
     }))
     .filter((j) => j.title);
 }
@@ -623,7 +645,13 @@ export default function ProfilePage() {
   /* Rows of the n8n "job data" table for this email (one per job). Picking a title shows that row. */
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [jobSel, setJobSel] = useState("");
-  const jobTitles = Array.from(new Set(jobs.map((j) => j.title).filter(Boolean)));
+  // options: job titles from the jobs list; when n8n sends no jobs, use the saved target jobs (targetjob, e.g. "1,2,3")
+  const savedTargets =
+    fetchState === "loaded"
+      ? splitTargets(profile.targetJobs)
+      : [];
+  const jobTitlesFromJobs = Array.from(new Set(jobs.map((j) => j.title).filter(Boolean)));
+  const jobTitles = jobTitlesFromJobs.length > 0 ? jobTitlesFromJobs : savedTargets;
   const selectedJob = jobSel ? jobs.find((j) => j.title === jobSel) : undefined;
   const shownLetter = selectedJob ? selectedJob.coverLetterUrl : coverLetter;
   const [jobLetterState, setJobLetterState] = useState<"idle" | "writing" | "error">("idle");
@@ -723,7 +751,14 @@ export default function ProfilePage() {
       setProfile((p) => rowToProfile(row, p, email));
       setCv((c) => rowToCv(row, c));
       setCoverLetter(str(row.cover_letter));
-      setJobs(toJobs((row as Record<string, unknown>).jobs));
+      const rawRow = row as Record<string, unknown>;
+      const jobList = toJobs(rawRow.jobs ?? rawRow.job_matches ?? rawRow.jobMatches ?? data.jobs);
+      if (jobList.length === 0) console.warn("[profile] no jobs found in response. Row keys:", Object.keys(rawRow), "jobs value:", rawRow.jobs);
+      setJobs(jobList);
+      // preselect the saved target job (targetjob holds job ids like "1,2,3"), else the first job
+      const savedIds = splitTargets(String(row.targetjob ?? ""));
+      const preferred = jobList.find((j) => savedIds.includes(j.id)) ?? jobList[0];
+      setJobSel((prev) => prev || preferred?.title || savedIds[0] || "");
       setFetchState("loaded");
     } catch (err) {
       setFetchMsg(err instanceof Error ? err.message : "Something went wrong");
