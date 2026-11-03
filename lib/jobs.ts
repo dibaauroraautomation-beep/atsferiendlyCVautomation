@@ -21,6 +21,7 @@ export type Job = {
   matchScore: number | null;
   cvLink: string | null;
   coverLetterLink: string | null;
+  coverLetterText: string | null;
   applyLink: string | null;
 };
 
@@ -84,9 +85,10 @@ export const normalizeJob = (row: RawRow, index: number): Job => {
   const location = pick(row, ["location", "job_location"]);
   const matchScore = toScore(pick(row, ["matchscore", "matchScore", "match_score", "score"]));
   const cvLink = toSafeUrl(pick(row, ["cvlink", "cvLink", "cv_link", "cv_url", "cvUrl"]));
-  const coverLetterLink = toSafeUrl(
-    pick(row, ["coverletterlink", "coverLetterLink", "cover_letter_link", "cover_letter_url", "coverLetterUrl"])
-  );
+    // The cover letter can be a link (file) OR the letter text itself
+  const rawLetter = pick(row, ["coverletterlink", "coverLetterLink", "cover_letter_link", "cover_letter_url", "coverLetterUrl", "coverletter", "cover_letter"]);
+  const coverLetterLink = toSafeUrl(rawLetter);
+  const coverLetterText = rawLetter && !coverLetterLink ? rawLetter : null;
   const applyLink = toSafeUrl(
     pick(row, ["applylink", "applyLink", "apply_link", "apply_url", "applyUrl", "url", "link"])
   );
@@ -95,7 +97,7 @@ export const normalizeJob = (row: RawRow, index: number): Job => {
   const rawId = pick(row, ["id", "job_id", "jobId"]);
   const id = rawId || applyLink || `${jobTitle ?? "job"}|${company ?? ""}|${location ?? ""}|${index}`;
 
-  return { id, jobTitle, company, location, matchScore, cvLink, coverLetterLink, applyLink };
+    return { id, jobTitle, company, location, matchScore, cvLink, coverLetterLink, coverLetterText, applyLink };
 };
 
 /** Calls the n8n webhook and returns clean jobs. Throws an Error with a user-friendly message. */

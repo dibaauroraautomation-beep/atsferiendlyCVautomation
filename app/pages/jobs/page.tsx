@@ -4,6 +4,8 @@ import { useAuth } from "@/app/contexts/AuthContext";
 import { createClient } from "@/lib/supabase/client";
 // import { fetchJobs, NOT_AVAILABLE, type Job } from "@/lib/jobs";
 import { fetchJobs, triggerJobSearch, NOT_AVAILABLE, type Job } from "@/lib/jobs";
+import { generateCoverLetterPDF } from "@/app/components/jsPDF";
+import { generateCoverLetterDocx } from "@/app/components/DocxGenerator";
 /* ------------------------------------------------------------------ */
 /* Jobs come from the n8n webhook (see lib/jobs.ts).                    */
 /* Columns: jobtitle, company, matchscore, location, applylink          */
@@ -100,7 +102,7 @@ export default function JobsPage() {
   const [searching, setSearching] = useState(false);
   const [searchNotice, setSearchNotice] = useState("");
   const [activeSearch, setActiveSearch] = useState<string | null>(null);
-
+  const [letterJob, setLetterJob] = useState<Job | null>(null);   // job whose cover letter is open
   // Name sent to n8n. Uses the name saved on the Supabase account, falls back to the email.
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
   const profileName =
@@ -416,7 +418,20 @@ export default function JobsPage() {
                       <td className="px-3 py-3.5 min-w-[160px] max-w-[260px] break-words"><Cell value={job.location} /></td>
                       <td className="px-3 py-3.5 whitespace-nowrap"><ScoreCell score={job.matchScore} /></td>
                       <td className="px-3 py-3.5"><ViewLink href={job.cvLink} /></td>
-                      <td className="px-3 py-3.5"><ViewLink href={job.coverLetterLink} /></td>
+                                            <td className="px-3 py-3.5">
+                        {job.coverLetterLink ? (
+                          <ViewLink href={job.coverLetterLink} />
+                        ) : job.coverLetterText ? (
+                          <button
+                            onClick={() => setLetterJob(job)}
+                            className="font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                          >
+                            View
+                          </button>
+                        ) : (
+                          <span className="text-slate-400 leading-tight">{NOT_AVAILABLE}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3.5">
                         {job.applyLink ? (
                           <button
@@ -440,6 +455,51 @@ export default function JobsPage() {
             </tbody>
           </table>
         </div>
+              {letterJob && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setLetterJob(null)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-base font-semibold text-slate-900">Cover Letter</h3>
+                <p className="truncate text-xs text-slate-500">
+                  {letterJob.jobTitle}
+                  {letterJob.company ? ` · ${letterJob.company}` : ""}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-3 text-xs font-medium">
+                <button
+                  onClick={() => generateCoverLetterDocx(letterJob.coverLetterText ?? "")}
+                  className="text-slate-500 hover:text-indigo-600"
+                >
+                  DOCX
+                </button>
+                <button
+                  onClick={() => generateCoverLetterPDF(letterJob.coverLetterText ?? "")}
+                  className="text-slate-500 hover:text-indigo-600"
+                >
+                  PDF
+                </button>
+                <button
+                  onClick={() => setLetterJob(null)}
+                  aria-label="Close"
+                  className="text-slate-400 hover:text-slate-700"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+              {letterJob.coverLetterText}
+            </p>
+          </div>
+        </div>
+      )}
       </section>
     </div>
   );
