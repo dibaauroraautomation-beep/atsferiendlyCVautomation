@@ -3,7 +3,9 @@ import { createServerSupabase } from "@/lib/supabase/server";
 // Loads the logged-in user's saved CV info from the n8n data table "Candidate cvinfo(ats cv)".
 // The row is matched by the user's email through an n8n webhook.
 // n8n webhook (production URL, workflow must be published).
-export async function GET() {
+export async function GET(request: Request) {
+  // job picked in the dropdown (optional): forwarded so n8n can answer for that job
+  const jobtitle = new URL(request.url).searchParams.get("jobtitle")?.trim() ?? "";
   const webhook = "https://n8naurora.duckdns.org/webhook/profile-cv-fetch";
   // const webhook = "https://n8naurora.duckdns.org/webhook-test/profile-cv-fetch";
   // Who is asking: taken from the logged-in Supabase session (cannot be faked by the browser).
@@ -26,7 +28,7 @@ export async function GET() {
     const res = await fetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, user_id: userId }),
+      body: JSON.stringify({ email, user_id: userId, jobtitle }),
       cache: "no-store",
       signal: AbortSignal.timeout(30_000),
     });

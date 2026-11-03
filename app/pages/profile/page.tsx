@@ -551,6 +551,7 @@ type JobRow = {
   url: string;
   cvUrl: string;
   coverLetterUrl: string;
+  target: string; // target job title (ats_cv) this job row was matched for
 };
 /* targetjob holds several job names in one text. Split on comma, new line, "|" or ";" -> one dropdown option each. */
 function splitTargets(v: string): string[] {
@@ -587,6 +588,7 @@ function toJobs(input: unknown): JobRow[] {
       url: pick(r, "applylink", "url", "link"),
       cvUrl: pick(r, "CV_link", "cv_link", "cvlink"),
       coverLetterUrl: pick(r, "CoverLetter", "coverletter", "cover_letter"),
+      target: pick(r, "target"),
     }))
     .filter((j) => j.title);
 }
@@ -645,15 +647,10 @@ export default function ProfilePage() {
   /* Rows of the n8n "job data" table for this email (one per job). Picking a title shows that row. */
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [jobSel, setJobSel] = useState("");
-  // options: job titles from the jobs list; when n8n sends no jobs, use the saved target jobs (targetjob, e.g. "1,2,3")
-  const savedTargets =
-    fetchState === "loaded"
-      ? splitTargets(profile.targetJobs)
-      : [];
-  const jobTitlesFromJobs = Array.from(new Set(jobs.map((j) => j.title).filter(Boolean)));
-  const jobTitles = jobTitlesFromJobs.length > 0 ? jobTitlesFromJobs : savedTargets;
-  const selectedJob = jobSel ? jobs.find((j) => j.title === jobSel) : undefined;
-  const shownLetter = selectedJob ? selectedJob.coverLetterUrl : coverLetter;
+  // dropdown options: the target jobs saved in ats_cv (targetjob). Empty when none are saved.
+  const jobTitles = fetchState === "loaded" ? splitTargets(profile.targetJobs) : [];
+  const selectedJob = jobSel ? jobs.find((j) => j.target === jobSel) ?? jobs.find((j) => j.title === jobSel) : undefined;
+  const shownLetter = selectedJob ? selectedJob.coverLetterUrl : jobSel ? "" : coverLetter;
   const [jobLetterState, setJobLetterState] = useState<"idle" | "writing" | "error">("idle");
   /* Picked a job without a cover letter: n8n writes it with AI, saves it and sends it back. */
   const missingLetterFor = selectedJob && !selectedJob.coverLetterUrl ? selectedJob.title : "";
@@ -683,6 +680,40 @@ export default function ProfilePage() {
       cancelled = true;
     };
   }, [missingLetterFor]);
+  /* Page init: after the profile loaded, ask the cover-letter webhook for the preselected job once.
+     (If that job has no letter, the effect above already calls it, so it is not called twice.) */
+  const initCoverRef = useRef(false);
+  useEffect(() => {
+    if (fetchState !== "loaded" || initCoverRef.current) return;
+    initCoverRef.current = true;
+    if (!jobSel || missingLetterFor) return;
+    const title = jobSel;
+    fetch("/api/profile-cv/cover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobtitle: title }),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || typeof data?.coverLetter !== "string" || !data.coverLetter) return;
+        setJobs((all) => all.map((j) => (j.target === title || j.title === title ? { ...j, coverLetterUrl: data.coverLetter } : j)));
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchState]);
+
+  /* Dropdown changed: send the picked target job (the user id is added on the server) to profile-cv-fetch.
+     n8n matches both tables and the whole page is updated from the answer. */
+  const onPickJob = (title: string) => {
+    setJobSel(title);
+    setCoverEditing(false);
+    setCoverMax(false);
+    setCoverState("idle");
+    setCoverMsg("");
+    setPickMsg("");
+    fetchSaved(true, title);
+  };
+  const [pickMsg, setPickMsg] = useState("");
   const [coverDraft, setCoverDraft] = useState("");
   const [coverEditing, setCoverEditing] = useState(false);
   const [coverMax, setCoverMax] = useState(false); // card enlarged to a big window
@@ -702,7 +733,7 @@ export default function ProfilePage() {
     const ok = await sendCv(profile, cv, text);
     if (ok && selectedJob) {
       const title = selectedJob.title;
-      setJobs((all) => all.map((j) => (j.title === title ? { ...j, coverLetterUrl: text } : j)));
+      setJobs((all) => all.map((j) => (j === selectedJob || (j.target === selectedJob.target && j.title === title) ? { ...j, coverLetterUrl: text } : j)));
       setCoverEditing(false);
       setCoverState("saved");
     } else if (ok) {
@@ -732,11 +763,17 @@ export default function ProfilePage() {
   const [uploadMsg, setUploadMsg] = useState("");
 
   /* Load the saved row (matched by the logged-in email) from the n8n table. */
-  const fetchSaved = async () => {
-    setFetchState("loading");
-    setFetchMsg("");
+  const [reloadTick, setReloadTick] = useState(0);
+  const [reloading, setReloading] = useState(false); // true while the dropdown reload runs
+  const fetchSaved = async (silent = false, jobtitle = "") => {
+    if (!silent) {
+      setFetchState("loading");
+      setFetchMsg("");
+    } else {
+      setReloading(true);
+    }
     try {
-      const res = await fetch("/api/profile-cv/fetch", { cache: "no-store" });
+      const res = await fetch(`/api/profile-cv/fetch${jobtitle ? `?jobtitle=${encodeURIComponent(jobtitle)}` : ""}`, { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
       const email: string = data.email || "";
@@ -744,7 +781,7 @@ export default function ProfilePage() {
         if (email) {
           setProfile((p) => ({ ...p, email }));
         }
-        setFetchState("empty");
+        if (!silent) setFetchState("empty");
         return;
       }
       const row = data.row as CvRow;
@@ -754,25 +791,40 @@ export default function ProfilePage() {
       const rawRow = row as Record<string, unknown>;
       const jobList = toJobs(rawRow.jobs ?? rawRow.job_matches ?? rawRow.jobMatches ?? data.jobs);
       if (jobList.length === 0) console.warn("[profile] no jobs found in response. Row keys:", Object.keys(rawRow), "jobs value:", rawRow.jobs);
-      setJobs(jobList);
-      // preselect the saved target job (targetjob holds job ids like "1,2,3"), else the first job
-      const savedIds = splitTargets(String(row.targetjob ?? ""));
-      const preferred = jobList.find((j) => savedIds.includes(j.id)) ?? jobList[0];
-      setJobSel((prev) => prev || preferred?.title || savedIds[0] || "");
+      // keep the jobs already loaded for other targets; never replace a letter we already have with an empty one
+      const sameRow = (o: JobRow, f: JobRow) => (f.target ? o.target === f.target : o.title === f.title);
+      setJobs((old) => {
+        const merged = jobList.map((f) => {
+          const prev = old.find((o) => sameRow(o, f));
+          return silent && prev && prev.coverLetterUrl && !f.coverLetterUrl ? { ...f, coverLetterUrl: prev.coverLetterUrl } : f;
+        });
+        const keep = silent ? old.filter((o) => !jobList.some((f) => sameRow(o, f))) : [];
+        return [...keep, ...merged];
+      });
+      // preselect the first saved target job (targetjob holds job titles)
+      const targets = splitTargets(String(row.targetjob ?? ""));
+      setJobSel((prev) => prev || targets[0] || "");
       setFetchState("loaded");
+      setReloadTick((n) => n + 1);
     } catch (err) {
+      if (silent) {
+        if (jobtitle) setPickMsg(err instanceof Error ? err.message : "Could not load this job");
+        return; // keep showing what is already on the page
+      }
       setFetchMsg(err instanceof Error ? err.message : "Something went wrong");
       setFetchState("error");
+    } finally {
+      if (silent) setReloading(false);
     }
   };
   // remember the loaded data as "already saved in n8n"
   useEffect(() => {
     if (fetchState === "loaded") baselineRef.current = snap(profile, cv, coverLetter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchState]);
+  }, [fetchState, reloadTick]);
   // when the page opens
   useEffect(() => {
-    fetchSaved();
+    fetchSaved(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -978,7 +1030,16 @@ export default function ProfilePage() {
   );
 
   return (
-    <div className={`grid grid-cols-1 items-start gap-5 ${gridCls}`}>
+    <>
+    {reloading && (
+      <div
+        role="status"
+        className="fixed left-1/2 top-4 z-[60] -translate-x-1/2 rounded-full bg-slate-900 px-4 py-1.5 text-xs font-medium text-white shadow-lg animate-pulse"
+      >
+        {t("Loading...")}
+      </div>
+    )}
+    <div className={`grid grid-cols-1 items-start gap-5 transition-opacity ${gridCls} ${reloading ? "pointer-events-none animate-pulse opacity-50" : ""}`}>
       <input
         ref={fileInput}
         type="file"
@@ -1076,7 +1137,7 @@ export default function ProfilePage() {
                           <select
                             className={`${inputCls} mt-0.5`}
                             value={jobSel}
-                            onChange={(e) => setJobSel(e.target.value)}
+                            onChange={(e) => onPickJob(e.target.value)}
                           >
                             <option value="">{t("Select a job title")}</option>
                             {jobTitles.map((o) => (
@@ -1085,6 +1146,10 @@ export default function ProfilePage() {
                               </option>
                             ))}
                           </select>
+                          {jobTitles.length === 0 && fetchState === "loaded" && (
+                            <p className="mt-1 text-[11px] text-slate-400">{t("No target jobs saved yet. Save your target jobs first.")}</p>
+                          )}
+                          {pickMsg && <p className="mt-1 text-[11px] text-red-500">{pickMsg}</p>}
                         </label>
                       </div>
                       <EditField
@@ -1105,7 +1170,7 @@ export default function ProfilePage() {
                           <select
                             className={`${inputCls} mt-0.5`}
                             value={jobSel}
-                            onChange={(e) => setJobSel(e.target.value)}
+                            onChange={(e) => onPickJob(e.target.value)}
                           >
                             <option value="">{t("Select a job title")}</option>
                             {jobTitles.map((o) => (
@@ -1114,6 +1179,10 @@ export default function ProfilePage() {
                               </option>
                             ))}
                           </select>
+                          {jobTitles.length === 0 && fetchState === "loaded" && (
+                            <p className="mt-1 text-[11px] text-slate-400">{t("No target jobs saved yet. Save your target jobs first.")}</p>
+                          )}
+                          {pickMsg && <p className="mt-1 text-[11px] text-red-500">{pickMsg}</p>}
                         </label>
                       </div>
                       <Field label={t("Experience Level")} value={profile.experienceLevel} />
@@ -1463,5 +1532,6 @@ export default function ProfilePage() {
         </Card>
       </aside>
     </div>
+    </>
   );
 }

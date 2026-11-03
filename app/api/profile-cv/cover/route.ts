@@ -40,7 +40,15 @@ export async function POST(req: Request) {
       json = {};
     }
     const letter = typeof json.CoverLetter === "string" ? json.CoverLetter : "";
-    return Response.json({ jobtitle, coverLetter: letter });
+    // n8n also sends the matched job row (job_matches) and the user's CV row (ats_cv): pass them on
+    return Response.json({
+      jobtitle,
+      coverLetter: letter,
+      found: json.found ?? null,
+      cvFound: json.cvFound ?? null,
+      job: json.job ?? null,
+      cv: json.cv ?? null,
+    });
   } catch {
     return Response.json({ error: "Could not reach the n8n workflow" }, { status: 502 });
   }

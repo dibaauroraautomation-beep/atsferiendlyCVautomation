@@ -4,8 +4,9 @@ import { createServerSupabase } from "@/lib/supabase/server";
 // Forwards the generated CV (PDF + info) to the n8n workflow.
 // n8n webhook (production URL, workflow must be published).
 export async function POST(request: NextRequest) {
+  // PRODUCTION webhook (workflow must be published).
   const webhook = "https://n8naurora.duckdns.org/webhook/profile-cv";
-  // const webhook = "https://n8naurora.duckdns.org/webhook-test/profile-cv";
+  // test: "https://n8naurora.duckdns.org/webhook-test/profile-cv" (only answers while the n8n editor is listening)
   const formData = await request.formData();
 
   // Who sent it: taken from the logged-in Supabase session (cannot be faked by the browser).
