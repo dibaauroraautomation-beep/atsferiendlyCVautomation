@@ -19,12 +19,12 @@ const MATCH_THRESHOLD = 70;
 const AUTOMATION_SCHEDULE = "Daily at 8:00 AM";
 // How many jobs to show in the "Top Matching Jobs" table
 const TOP_JOBS_LIMIT = 5;
-// Sidebar menu for automated users (same 4 items as the Jobs page)
+// Sidebar menu for automated users
 const AUTOMATED_MENU = [
   { name: "Dashboard", key: "automatic-Dashboard" },
-  { name: "Jobs", key: "jobs" },
-  { name: "Reports", key: "reports" },
-  { name: "Profile", key: "profile" },
+  { name: "Profile Generator", key: "profile" },
+  { name: "Matching Jobs and Automations", key: "jobs" },
+  { name: "Application Status", key: "reports" },
 ];
 
 /*
@@ -504,7 +504,7 @@ export default function AutomaticDashboardPage() {
         </section>
 
         {/* Table + status */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+        {/* <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
           <section className="xl:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
             <h3 className="text-sm font-semibold text-slate-900 px-5 py-4 border-b border-slate-100">
               Top Matching Jobs
@@ -563,15 +563,15 @@ export default function AutomaticDashboardPage() {
                   )}
                 </tbody>
               </table>
-            </div>
-            {!loading && stats.total > TOP_JOBS_LIMIT && (
+            </div> */}
+            {/* {!loading && stats.total > TOP_JOBS_LIMIT && (
               <p className="px-5 py-3 text-xs text-slate-500 border-t border-slate-100">
                 Showing {TOP_JOBS_LIMIT} of {stats.total} jobs. See all on the Jobs page.
               </p>
             )}
-          </section>
+          </section> */}
 
-          <section className="bg-white rounded-xl border border-slate-200 h-fit">
+          {/* <section className="bg-white rounded-xl border border-slate-200 h-fit">
             <h3 className="text-sm font-semibold text-slate-900 px-5 py-4 border-b border-slate-100">
               Automation Status
             </h3>
@@ -600,9 +600,9 @@ export default function AutomaticDashboardPage() {
                 </p>
               )}
             </div>
-          </section>
+          </section> */}
         </div>
-      </div>
+      {/* </div> */}
     </NavAndSidebar>
   );
 }

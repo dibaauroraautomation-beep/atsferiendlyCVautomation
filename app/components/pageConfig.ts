@@ -27,8 +27,8 @@ export const MANUAL_MENU = [
   ...SHARED,
 ];
 
-// Automated-user pages: on any of these pages, the menu shows only this group
-export const AUTOMATED_MENU = ["jobs", "reports", ...SHARED];
+// Automated-user pages: on any of these pages, the menu shows this exact sequence
+export const AUTOMATED_MENU = ["Dashboard", "profile", "jobs", "reports"];
 
 // ---------------------------------------------------------------------------
 // Pages
@@ -94,16 +94,18 @@ export const MENU_ITEMS: { name: string; key: string }[] = [
   { name: "Cover Letter Generator", key: "coverLetterGenerator" },
   { name: "Interview Prep AI", key: "Interview_Prep_AI" },
   { name: "Applications Status", key: "ApplicationsStatus" },
-  { name: "Jobs", key: "jobs" },
-  { name: "Reports", key: "reports" },
-  { name: "Profile", key: "profile" },
+  { name: "Matching Jobs and Automations", key: "jobs" },
+  { name: "Application Status", key: "reports" },
+  { name: "Profile Generator", key: "profile" },
 ];
 
 // Returns the menu items to show for the page the user is currently on.
-// - Page has a "menu" list  -> only those items (in MENU_ITEMS order)
+// - Page has a "menu" list  -> only those items, in the configured sequence
 // - Page has no "menu" list -> the full MENU_ITEMS list
 export function getMenuFor(pageKey: string) {
   const allowed = PAGE_CONFIG[pageKey]?.menu;
   if (!allowed) return MENU_ITEMS;
-  return MENU_ITEMS.filter((item) => allowed.includes(item.key));
+  return allowed
+    .map((key) => MENU_ITEMS.find((item) => item.key === key))
+    .filter((item): item is { name: string; key: string } => Boolean(item));
 }
