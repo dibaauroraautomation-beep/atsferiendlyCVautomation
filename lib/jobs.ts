@@ -18,7 +18,9 @@ export type Job = {
   jobTitle: string | null;
   company: string | null;
   location: string | null;
+  date: string | null;
   matchScore: number | null;
+  atsScore: number | null;
   cvLink: string | null;
   coverLetterLink: string | null;
   coverLetterText: string | null;
@@ -83,7 +85,9 @@ export const normalizeJob = (row: RawRow, index: number): Job => {
   const jobTitle = pick(row, ["jobtitle", "jobTitle", "job_title", "title"]);
   const company = pick(row, ["company", "company_name", "companyName"]);
   const location = pick(row, ["location", "job_location"]);
+  const date = pick(row, ["date", "Date", "jobdate", "jobDate", "job_date", "posted_date", "postedDate", "created_at", "createdAt"]);
   const matchScore = toScore(pick(row, ["matchscore", "matchScore", "match_score", "score"]));
+  const atsScore = toScore(pick(row, ["atsscore", "atsScore", "ats_score", "ATS Score", "ats score", "ats"]));
   const cvLink = toSafeUrl(pick(row, ["cvlink", "cvLink", "cv_link", "cv_url", "cvUrl"]));
     // The cover letter can be a link (file) OR the letter text itself
   const rawLetter = pick(row, ["coverletterlink", "coverLetterLink", "cover_letter_link", "cover_letter_url", "coverLetterUrl", "coverletter", "cover_letter"]);
@@ -97,7 +101,7 @@ export const normalizeJob = (row: RawRow, index: number): Job => {
   const rawId = pick(row, ["id", "job_id", "jobId"]);
   const id = rawId || applyLink || `${jobTitle ?? "job"}|${company ?? ""}|${location ?? ""}|${index}`;
 
-    return { id, jobTitle, company, location, matchScore, cvLink, coverLetterLink, coverLetterText, applyLink };
+    return { id, jobTitle, company, location, date, matchScore, atsScore, cvLink, coverLetterLink, coverLetterText, applyLink };
 };
 
 /** Calls the n8n webhook and returns clean jobs. Throws an Error with a user-friendly message. */
@@ -111,7 +115,7 @@ export async function fetchJobs(): Promise<Job[]> {
 
   const { data, error } = await supabase
     .from("job_matches")
-    .select("job_id, title, company, location, apply_url, match_score, cv, coverletter, created_at")
+    .select("*")
     .eq("user_id", user.id)
     .order("match_score", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
@@ -129,7 +133,9 @@ export async function fetchJobs(): Promise<Job[]> {
           jobtitle: m.title,
           company: m.company,
           location: m.location,
+          date: m.date ?? m.job_date ?? m.posted_date ?? m.created_at,
           matchscore: m.match_score,
+          atsscore: m.ats_score ?? m.atsScore,
           applylink: m.apply_url,
           cvlink: m.cv,
           coverletterlink: m.coverletter,

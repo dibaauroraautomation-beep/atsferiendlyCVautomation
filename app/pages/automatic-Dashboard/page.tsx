@@ -22,9 +22,9 @@ const TOP_JOBS_LIMIT = 5;
 // Sidebar menu for automated users
 const AUTOMATED_MENU = [
   { name: "Dashboard", key: "automatic-Dashboard" },
-  { name: "Profile Generator", key: "profile" },
-  { name: "Matching Jobs and Automations", key: "jobs" },
-  { name: "Application Status", key: "reports" },
+  { name: "Profile Generator", key: "profileGenerator" },
+  { name: "Matching Jobs and Automations", key: "MatchingJobs" },
+  { name: "Application Status", key: "automatic-ApplicationStatus" },
 ];
 
 /*

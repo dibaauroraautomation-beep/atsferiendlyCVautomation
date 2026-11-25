@@ -79,6 +79,25 @@ function ViewLink({ href }: { href: string | null }) {
     </a>
   );
 }
+
+/** Shows the job date in a readable form; shows the raw text if it is not a real date. */
+function formatDate(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" });
+}
+
+/** Status column: what the user picked for a job. */
+type JobStatus = "applied" | "not_applied";
+const STATUS_OPTIONS: { value: JobStatus; label: string }[] = [
+  { value: "applied", label: "Applied" },
+  { value: "not_applied", label: "Not Applied" },
+];
+
+// shared cell styles for the grid look of the table
+const CELL = "border-b border-r border-slate-200 px-3 py-3.5 align-middle";
+const CELL_LAST = "border-b border-slate-200 px-3 py-3.5 align-middle";
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
@@ -104,6 +123,10 @@ export default function JobsPage() {
   const [activeSearch, setActiveSearch] = useState<string | null>(null);
   const [letterJob, setLetterJob] = useState<Job | null>(null);   // job whose cover letter is open
   // Name sent to n8n. Uses the name saved on the Supabase account, falls back to the email.
+    // Action column: jobs the user already opened ("View" becomes "Viewed")
+  const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
+  // Status column: the user's choice per job (falls back to the saved application in Supabase)
+  const [statusById, setStatusById] = useState<Record<string, JobStatus>>({});
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
   const profileName =
     String(meta.full_name || meta.name || meta.display_name || meta.username || "").trim() ||
@@ -162,6 +185,36 @@ export default function JobsPage() {
     loadJobs();
   }, [authLoading, user, loadJobs]);
 
+  /* ---------- Remember "Viewed" and the Status choice between visits (saved in this browser) ---------- */
+  const uiStateKey = user ? `jobs-ui-state:${user.id}` : null;
+
+  useEffect(() => {
+    let viewed: string[] = [];
+    let status: Record<string, JobStatus> = {};
+    if (uiStateKey) {
+      try {
+        const saved = localStorage.getItem(uiStateKey);
+        if (saved) {
+          const parsed = JSON.parse(saved) as { viewed?: string[]; status?: Record<string, JobStatus> };
+          viewed = parsed.viewed ?? [];
+          status = parsed.status ?? {};
+        }
+      } catch {
+        /* ignore a corrupted value */
+      }
+    }
+    setViewedIds(new Set(viewed));
+    setStatusById(status);
+  }, [uiStateKey]);
+
+  const persistUiState = (viewed: Set<string>, status: Record<string, JobStatus>) => {
+    if (!uiStateKey) return;
+    try {
+      localStorage.setItem(uiStateKey, JSON.stringify({ viewed: Array.from(viewed), status }));
+    } catch {
+      /* storage full or blocked */
+    }
+  };
   /* ---------- Filter options from the real data ---------- */
   const titleOptions = useMemo(() => unique(jobs.map((j) => j.jobTitle)).map((v) => ({ value: v, label: v })), [jobs]);
   const companyOptions = useMemo(() => unique(jobs.map((j) => j.company)).map((v) => ({ value: v, label: v })), [jobs]);
@@ -187,11 +240,28 @@ export default function JobsPage() {
 
   const strongMatches = filtered.filter((j) => (j.matchScore ?? 0) >= STRONG_MATCH).length;
 
-  /* ---------- Apply: open the link and save an "application" row ---------- */
-  const handleApply = async (job: Job) => {
+    /* ---------- Action: open the job link and mark the row as "Viewed" ---------- */
+  const handleView = (job: Job) => {
     if (!job.applyLink) return;
     window.open(job.applyLink, "_blank", "noopener,noreferrer");
-    if (appliedJobIds.has(job.id)) return;
+    if (viewedIds.has(job.id)) return;
+
+    const next = new Set(viewedIds).add(job.id);
+    setViewedIds(next);
+    persistUiState(next, statusById);
+  };
+
+  /* ---------- Status: Applied / Not Applied dropdown ---------- */
+  const getStatus = (job: Job): JobStatus =>
+    statusById[job.id] ?? (appliedJobIds.has(job.id) ? "applied" : "not_applied");
+
+  const handleStatusChange = async (job: Job, status: JobStatus) => {
+    const nextStatus = { ...statusById, [job.id]: status };
+    setStatusById(nextStatus);
+    persistUiState(viewedIds, nextStatus);
+
+    // "Applied" also saves an application row, the same way the old Apply button did
+    if (status !== "applied" || appliedJobIds.has(job.id)) return;
 
     setApplyingId(job.id);
     const { error: insertError } = await supabase.from("user_documents").insert({
@@ -362,42 +432,77 @@ export default function JobsPage() {
           </button>
         </div>
 
-        {/*
+                {/*
           The table scrolls inside this box (both directions), and the box is never taller
           than the screen. So the left-right scrollbar always sits at the bottom of the
           visible area, and there is only one horizontal scrollbar.
         */}
-        {/* Only scrolls up/down. Columns have fixed widths, so the table always fits the box. */}
-        <div className="overflow-y-auto overscroll-contain max-h-[70vh] md:max-h-[calc(100dvh-22rem)] min-h-[16rem]">
-          <table className="w-full table-fixed text-sm">
+        <div className="overflow-auto overscroll-contain max-h-[70vh] md:max-h-[calc(100dvh-22rem)] min-h-[16rem]">
+          <table className="w-full min-w-[1100px] table-fixed border-separate border-spacing-0 text-sm">
             <colgroup>
-              <col className="w-[24%]" />{/* Job Title */}
-              <col className="w-[15%]" />{/* Company */}
-              <col className="w-[14%]" />{/* Location */}
-              <col className="w-[10%]" />{/* Match Score */}
-              <col className="w-[9%]" />{/* CV */}
-              <col className="w-[11%]" />{/* Cover Letter */}
-              <col className="w-[17%]" />{/* Apply */}
+              <col className="w-[18%]" />{/* Title */}
+              <col className="w-[12%]" />{/* Company */}
+              <col className="w-[11%]" />{/* Location */}
+              <col className="w-[9%]" />{/* Date */}
+              <col className="w-[8%]" />{/* Original Match */}
+              <col className="w-[8%]" />{/* Action */}
+              <col className="w-[6%]" />{/* ATS CV */}
+              <col className="w-[8%]" />{/* ATS Cover Letter */}
+              <col className="w-[7%]" />{/* ATS Score */}
+              <col className="w-[13%]" />{/* Status */}
             </colgroup>
             <thead>
-              <tr className="text-left text-slate-600">
-                <th className="sticky top-0 z-10 bg-slate-50 px-4 py-3 font-medium">Job Title</th>
-                <th className="sticky top-0 z-10 bg-slate-50 px-3 py-3 font-medium">Company</th>
-                <th className="sticky top-0 z-10 bg-slate-50 px-3 py-3 font-medium">Location</th>
-                <th className="sticky top-0 z-10 bg-slate-50 px-3 py-3 font-medium">Match Score</th>
-                <th className="sticky top-0 z-10 bg-slate-50 px-3 py-3 font-medium">CV</th>
-                <th className="sticky top-0 z-10 bg-slate-50 px-3 py-3 font-medium">Cover Letter</th>
-                <th className="sticky top-0 z-10 bg-slate-50 px-4 py-3 font-medium">Apply</th>
+              {/* Row 1: group headers. Status spans both header rows. */}
+              <tr className="text-slate-700">
+                <th
+                  colSpan={6}
+                  className="sticky top-0 z-10 h-10 border-b border-r border-slate-200 bg-slate-100 px-4 text-left font-semibold"
+                >
+                  Top Matching Jobs
+                </th>
+                <th
+                  colSpan={3}
+                  className="sticky top-0 z-10 h-10 border-b border-r border-slate-200 bg-slate-100 px-4 text-left font-semibold"
+                >
+                  Automation
+                </th>
+                <th
+                  rowSpan={2}
+                  className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-3 text-center font-medium text-slate-600"
+                >
+                  Status
+                </th>
+              </tr>
+              {/* Row 2: column headers. Sticks right under row 1 (2.5rem tall). */}
+              <tr className="text-slate-600">
+                {[
+                  "Title",
+                  "Company",
+                  "Location",
+                  "Date",
+                  "Original Match",
+                  "Action",
+                  "ATS CV",
+                  "ATS Cover Letter",
+                  "ATS Score",
+                ].map((heading) => (
+                  <th
+                    key={heading}
+                    className="sticky top-[2.5rem] z-10 border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-center font-medium"
+                  >
+                    {heading}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-slate-400">Loading jobs...</td>
+                  <td colSpan={10} className="px-5 py-10 text-center text-slate-400">Loading jobs...</td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-10 text-center text-slate-500">
+                  <td colSpan={10} className="px-5 py-10 text-center text-slate-500">
                     {jobs.length === 0
                       ? "No jobs yet. Matches will appear here after your next automated search."
                       : "No jobs match these filters."}
@@ -410,15 +515,40 @@ export default function JobsPage() {
                 </tr>
               ) : (
                 filtered.map((job) => {
-                  const applied = appliedJobIds.has(job.id);
+                  const viewed = viewedIds.has(job.id);
+                  const status = getStatus(job);
                   return (
-                    <tr key={job.id} className="border-t border-slate-100">
-                      <td className="px-5 py-3.5 min-w-[240px] max-w-[420px] break-words"><Cell value={job.jobTitle} strong /></td>
-                      <td className="px-3 py-3.5 min-w-[160px] max-w-[260px] break-words"><Cell value={job.company} /></td>
-                      <td className="px-3 py-3.5 min-w-[160px] max-w-[260px] break-words"><Cell value={job.location} /></td>
-                      <td className="px-3 py-3.5 whitespace-nowrap"><ScoreCell score={job.matchScore} /></td>
-                      <td className="px-3 py-3.5"><ViewLink href={job.cvLink} /></td>
-                                            <td className="px-3 py-3.5">
+                    <tr key={job.id} className="hover:bg-slate-50/60">
+                      {/* Title */}
+                      <td className={`${CELL} break-words`}><Cell value={job.jobTitle} strong /></td>
+                      {/* Company */}
+                      <td className={`${CELL} break-words`}><Cell value={job.company} /></td>
+                      {/* Location */}
+                      <td className={`${CELL} break-words`}><Cell value={job.location} /></td>
+                      {/* Date */}
+                      <td className={`${CELL} text-center`}><Cell value={formatDate(job.date)} /></td>
+                      {/* Original Match */}
+                      <td className={`${CELL} whitespace-nowrap text-center`}><ScoreCell score={job.matchScore} /></td>
+                      {/* Action: View, then Viewed once clicked */}
+                      <td className={`${CELL} text-center`}>
+                        {job.applyLink ? (
+                          <button
+                            onClick={() => handleView(job)}
+                            className={`px-3 py-1 text-sm font-medium rounded-md whitespace-nowrap transition ${viewed
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                              }`}
+                          >
+                            {viewed ? "Viewed" : "View"}
+                          </button>
+                        ) : (
+                          <span className="text-slate-400">{NOT_AVAILABLE}</span>
+                        )}
+                      </td>
+                      {/* ATS CV */}
+                      <td className={`${CELL} text-center`}><ViewLink href={job.cvLink} /></td>
+                      {/* ATS Cover Letter */}
+                      <td className={`${CELL} text-center`}>
                         {job.coverLetterLink ? (
                           <ViewLink href={job.coverLetterLink} />
                         ) : job.coverLetterText ? (
@@ -432,21 +562,26 @@ export default function JobsPage() {
                           <span className="text-slate-400 leading-tight">{NOT_AVAILABLE}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3.5">
-                        {job.applyLink ? (
-                          <button
-                            onClick={() => handleApply(job)}
-                            disabled={applyingId === job.id}
-                            className={`px-4 py-1.5 text-sm font-medium rounded-md whitespace-nowrap transition ${applied
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : "bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-60"
-                              }`}
-                          >
-                            {applied ? "Applied" : applyingId === job.id ? "Saving..." : "Apply"}
-                          </button>
-                        ) : (
-                          <span className="text-slate-400">{NOT_AVAILABLE}</span>
-                        )}
+                      {/* ATS Score (comes from the n8n workflow) */}
+                      <td className={`${CELL} whitespace-nowrap text-center`}><ScoreCell score={job.atsScore} /></td>
+                      {/* Status: Applied / Not Applied */}
+                      <td className={`${CELL_LAST} text-center`}>
+                        <select
+                          value={status}
+                          onChange={(e) => handleStatusChange(job, e.target.value as JobStatus)}
+                          disabled={applyingId === job.id}
+                          aria-label="Application status"
+                          className={`w-full rounded-md border px-2 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:opacity-60 ${status === "applied"
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-slate-200 bg-white text-slate-600"
+                            }`}
+                        >
+                          {STATUS_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                     </tr>
                   );

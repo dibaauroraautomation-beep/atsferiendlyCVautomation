@@ -16,7 +16,7 @@ export type PageConfig = {
 // ---------------------------------------------------------------------------
 
 // Shown on both groups
-const SHARED = ["Dashboard", "profile"];
+const SHARED = ["Dashboard", "profileGenerator"];
 
 // Manual-user pages: on any of these pages, the menu shows only this group
 export const MANUAL_MENU = [
@@ -28,7 +28,7 @@ export const MANUAL_MENU = [
 ];
 
 // Automated-user pages: on any of these pages, the menu shows this exact sequence
-export const AUTOMATED_MENU = ["Dashboard", "profile", "jobs", "reports"];
+export const AUTOMATED_MENU = ["Dashboard", "profileGenerator", "MatchingJobs", "automatic-ApplicationStatus"];
 
 // ---------------------------------------------------------------------------
 // Pages
@@ -62,16 +62,16 @@ export const PAGE_CONFIG: Record<string, PageConfig> = {
   },
 
   // ----- Automated pages -----
-  jobs: {
-    title: "Jobs",
+  MatchingJobs: {
+    title: "Matching Jobs and Automations",
     description:
       "See the jobs found by your automated job search and track its progress.",
     menu: AUTOMATED_MENU,
   },
-  reports: {
-    title: "Applications & Reports",
+  "automatic-ApplicationStatus": {
+    title: "Application Status",
     description:
-      "Track your job applications and see your weekly job search report.",
+      "Track, manage and organize your job applications in one place.",
     menu: AUTOMATED_MENU,
   },
 
@@ -80,8 +80,8 @@ export const PAGE_CONFIG: Record<string, PageConfig> = {
     title: "Dashboard Overview",
     description: "Track your daily analytics and user growth in real-time.",
   },
-  profile: {
-    title: "Profile",
+  profileGenerator: {
+    title: "Profile Generator",
     description: "View and update your personal information and CV details.",
     menu: AUTOMATED_MENU,
   },
@@ -94,9 +94,9 @@ export const MENU_ITEMS: { name: string; key: string }[] = [
   { name: "Cover Letter Generator", key: "coverLetterGenerator" },
   { name: "Interview Prep AI", key: "Interview_Prep_AI" },
   { name: "Applications Status", key: "ApplicationsStatus" },
-  { name: "Matching Jobs and Automations", key: "jobs" },
-  { name: "Application Status", key: "reports" },
-  { name: "Profile Generator", key: "profile" },
+  { name: "Matching Jobs and Automations", key: "MatchingJobs" },
+  { name: "Application Status", key: "automatic-ApplicationStatus" },
+  { name: "Profile Generator", key: "profileGenerator" },
 ];
 
 // Returns the menu items to show for the page the user is currently on.
