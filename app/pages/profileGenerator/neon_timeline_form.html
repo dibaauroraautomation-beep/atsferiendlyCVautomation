@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neon timeline with one long form</title>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.fl{display:block;font-size:12px;font-weight:700;color:#0b1024;margin:0 0 7px 4px}
+.fi{height:46px;border-radius:12px;border:1.5px solid var(--c);background:linear-gradient(180deg,#f3f5fb,#fff);box-shadow:0 0 10px var(--c),inset 0 3px 5px rgba(11,16,36,.10);display:flex;align-items:center;padding:0 16px;font-size:13px;color:#6b7390;box-sizing:border-box}
+.sh{display:flex;align-items:center;gap:16px;margin:0 0 16px;font-size:15px;font-weight:800;color:#0b1024;letter-spacing:.2px}
+.sh i{flex:1;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--c),#ffffff00);box-shadow:0 0 8px var(--c)}
+.sg{display:grid;grid-template-columns:1fr;gap:16px 0;margin-bottom:30px}
+.fb{height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#0b1024;box-sizing:border-box}
+
+.tb{transition:transform .12s}
+#tabbar::-webkit-scrollbar{display:none}
+.tb.on,.tb:active{transform:translateY(6px)!important;filter:drop-shadow(0 1px 0 var(--d)) drop-shadow(0 3px 3px rgba(0,0,0,.35)) drop-shadow(0 0 7px var(--g))!important}
+.tb.on>div,.tb:active>div{box-shadow:inset 0 8px 12px rgba(0,0,0,.4),inset 0 -3px 6px rgba(255,255,255,.25)!important;filter:brightness(.88)}
+html{scroll-behavior:smooth}
+body{background:#fff}</style>
+</head>
+<body>
+<div id="s-top" style="width:100%;min-height:100vh;background:#ffffff;padding:0 0 90px;box-sizing:border-box">
+<a id="uptop" href="#s-top" aria-label="Back to top" style="position:fixed;right:28px;bottom:28px;z-index:50;width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;text-decoration:none;cursor:pointer;background:#ffffff;border:2.5px solid #22b8ff;box-sizing:border-box;box-shadow:0 5px 0 #0f5272,0 10px 12px rgba(0,0,0,.18),0 0 16px #22b8ff"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#22b8ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></a>
+<div id="tabbar" style="position:sticky;top:0;z-index:40;background:#ffffff;height:190px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none">
+<div style="position:relative;width:2640px;height:190px">
+<a href="#s0" class="tb" style="--d:#0f5272;--g:#22b8ff;display:block;text-decoration:none;cursor:pointer;position:absolute;left:624px;top:62px;width:164px;height:76px;filter:drop-shadow(0 7px 0 #0f5272) drop-shadow(0 14px 9px rgba(0,0,0,.3)) drop-shadow(0 0 12px #22b8ff)"><div style="width:164px;height:76px;background:linear-gradient(180deg,#ffffffaa 0,#22b8ff 38%,#1780b2 100%);clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%,12% 50%);display:flex;align-items:center;justify-content:center;gap:4px;padding:0 20px 0 26px;box-sizing:border-box"><div style="flex:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg></div><div style="font-size:12.5px;font-weight:700;line-height:1.15;color:#0b1024;text-align:left">Upload CV</div></div></a>
+<a href="#s1" class="tb" style="--d:#223772;--g:#4d7bff;display:block;text-decoration:none;cursor:pointer;position:absolute;left:778px;top:62px;width:164px;height:76px;filter:drop-shadow(0 7px 0 #223772) drop-shadow(0 14px 9px rgba(0,0,0,.3)) drop-shadow(0 0 12px #4d7bff)"><div style="width:164px;height:76px;background:linear-gradient(180deg,#ffffffaa 0,#4d7bff 38%,#3556b2 100%);clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%,12% 50%);display:flex;align-items:center;justify-content:center;gap:4px;padding:0 20px 0 26px;box-sizing:border-box"><div style="flex:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg></div><div style="font-size:12.5px;font-weight:700;line-height:1.15;color:#0b1024;text-align:left">Profile Information</div></div></a>
+<a href="#s2" class="tb" style="--d:#452972;--g:#9b5cff;display:block;text-decoration:none;cursor:pointer;position:absolute;left:932px;top:62px;width:164px;height:76px;filter:drop-shadow(0 7px 0 #452972) drop-shadow(0 14px 9px rgba(0,0,0,.3)) drop-shadow(0 0 12px #9b5cff)"><div style="width:164px;height:76px;background:linear-gradient(180deg,#ffffffaa 0,#9b5cff 38%,#6c40b2 100%);clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%,12% 50%);display:flex;align-items:center;justify-content:center;gap:4px;padding:0 20px 0 26px;box-sizing:border-box"><div style="flex:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/></svg></div><div style="font-size:12.5px;font-weight:700;line-height:1.15;color:#0b1024;text-align:left">Education</div></div></a>
+<a href="#s3" class="tb" style="--d:#721360;--g:#ff2bd6;display:block;text-decoration:none;cursor:pointer;position:absolute;left:1086px;top:62px;width:164px;height:76px;filter:drop-shadow(0 7px 0 #721360) drop-shadow(0 14px 9px rgba(0,0,0,.3)) drop-shadow(0 0 12px #ff2bd6)"><div style="width:164px;height:76px;background:linear-gradient(180deg,#ffffffaa 0,#ff2bd6 38%,#b21e95 100%);clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%,12% 50%);display:flex;align-items:center;justify-content:center;gap:4px;padding:0 20px 0 26px;box-sizing:border-box"><div style="flex:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h7l2 2h9v11H3z"/></svg></div><div style="font-size:12.5px;font-weight:700;line-height:1.15;color:#0b1024;text-align:left">Projects</div></div></a>
+<a href="#s4" class="tb" style="--d:#721b31;--g:#ff3d6e;display:block;text-decoration:none;cursor:pointer;position:absolute;left:1240px;top:62px;width:164px;height:76px;filter:drop-shadow(0 7px 0 #721b31) drop-shadow(0 14px 9px rgba(0,0,0,.3)) drop-shadow(0 0 12px #ff3d6e)"><div style="width:164px;height:76px;background:linear-gradient(180deg,#ffffffaa 0,#ff3d6e 38%,#b22a4d 100%);clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%,12% 50%);display:flex;align-items:center;justify-content:center;gap:4px;padding:0 20px 0 26px;box-sizing:border-box"><div style="flex:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V4h6v3M3 13h18"/></svg></div><div style="font-size:12.5px;font-weight:700;line-height:1.15;color:#0b1024;text-align:left">Work Experience</div></div></a>
+<a href="#s5" class="tb" style="--d:#723e0d;--g:#ff8a1f;display:block;text-decoration:none;cursor:pointer;position:absolute;left:1394px;top:62px;width:164px;height:76px;filter:drop-shadow(0 7px 0 #723e0d) drop-shadow(0 14px 9px rgba(0,0,0,.3)) drop-shadow(0 0 12px #ff8a1f)"><div style="width:164px;height:76px;background:linear-gradient(180deg,#ffffffaa 0,#ff8a1f 38%,#b26015 100%);clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%,12% 50%);display:flex;align-items:center;justify-content:center;gap:4px;padding:0 20px 0 26px;box-sizing:border-box"><div style="flex:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="M8.5 14L7 22l5-3 5 3-1.5-8"/></svg></div><div style="font-size:12.5px;font-weight:700;line-height:1.15;color:#0b1024;text-align:left">Certifications</div></div></a>
+<a href="#s6" class="tb" style="--d:#6c5700;--g:#f2c200;display:block;text-decoration:none;cursor:pointer;position:absolute;left:1548px;top:62px;width:164px;height:76px;filter:drop-shadow(0 7px 0 #6c5700) drop-shadow(0 14px 9px rgba(0,0,0,.3)) drop-shadow(0 0 12px #f2c200)"><div style="width:164px;height:76px;background:linear-gradient(180deg,#ffffffaa 0,#f2c200 38%,#a98700 100%);clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%,12% 50%);display:flex;align-items:center;justify-content:center;gap:4px;padding:0 20px 0 26px;box-sizing:border-box"><div style="flex:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></div><div style="font-size:12.5px;font-weight:700;line-height:1.15;color:#0b1024;text-align:left">Skills</div></div></a>
+<a href="#s7" class="tb" style="--d:#38630d;--g:#7ddc1f;display:block;text-decoration:none;cursor:pointer;position:absolute;left:1702px;top:62px;width:164px;height:76px;filter:drop-shadow(0 7px 0 #38630d) drop-shadow(0 14px 9px rgba(0,0,0,.3)) drop-shadow(0 0 12px #7ddc1f)"><div style="width:164px;height:76px;background:linear-gradient(180deg,#ffffffaa 0,#7ddc1f 38%,#579a15 100%);clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%,12% 50%);display:flex;align-items:center;justify-content:center;gap:4px;padding:0 20px 0 26px;box-sizing:border-box"><div style="flex:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div><div style="font-size:12.5px;font-weight:700;line-height:1.15;color:#0b1024;text-align:left">Cover Letter</div></div></a>
+<a href="#s8" class="tb" style="--d:#006040;--g:#00d68f;display:block;text-decoration:none;cursor:pointer;position:absolute;left:1856px;top:62px;width:164px;height:76px;filter:drop-shadow(0 7px 0 #006040) drop-shadow(0 14px 9px rgba(0,0,0,.3)) drop-shadow(0 0 12px #00d68f)"><div style="width:164px;height:76px;background:linear-gradient(180deg,#ffffffaa 0,#00d68f 38%,#009564 100%);clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%,12% 50%);display:flex;align-items:center;justify-content:center;gap:4px;padding:0 20px 0 26px;box-sizing:border-box"><div style="flex:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div><div style="font-size:12.5px;font-weight:700;line-height:1.15;color:#0b1024;text-align:left">CV Preview</div></div></a>
+</div></div>
+<div style="width:640px;margin:28px auto 0;box-sizing:border-box;padding:34px 36px;border-radius:24px;background:linear-gradient(180deg,#ffffff,#f7f8fd);border:1.5px solid #4d7bff;border-left-color:#ffffff;border-right-color:#ffffff;box-shadow:0 8px 0 #223772,0 18px 28px rgba(0,0,0,.18),0 -8px 22px -8px #4d7bff">
+<div style="font-size:24px;font-weight:800;color:#0b1024;margin-left:4px">Build your CV</div>
+<div style="font-size:13px;color:#6b7390;margin:4px 0 26px 4px">Complete every section below · 9 steps in one form</div>
+<div id="s0" style="scroll-margin-top:210px;margin-top:0px"><div style="display:flex;align-items:center;gap:14px;margin:0 0 20px"><div style="flex:none;width:46px;height:46px;border-radius:50%;background:linear-gradient(180deg,#ffffffaa 0,#22b8ff 38%,#1780b2 100%);box-shadow:0 4px 0 #0f5272,0 0 14px #22b8ff;display:flex;align-items:center;justify-content:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg></div><div><div style="font-size:19px;font-weight:800;color:#0b1024">Upload CV</div><div style="font-size:12px;color:#6b7390;margin-top:2px">Step 1 of 9 · Start with your existing CV</div></div></div><div class="sh" style="--c:#22b8ff">Upload file<i></i></div>
+<div class="sg">
+<div style="height:190px;border-radius:16px;border:2px dashed #22b8ff;background:linear-gradient(180deg,#f3f5fb,#fff);box-shadow:0 0 12px #22b8ff,inset 0 3px 6px rgba(11,16,36,.08);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px"><div style="width:54px;height:54px;border-radius:50%;background:linear-gradient(180deg,#ffffffaa 0,#22b8ff 38%,#1780b2 100%);box-shadow:0 4px 0 #0f5272,0 0 14px #22b8ff;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg></div><div style="font-size:15px;font-weight:800;color:#0b1024">Drag &amp; drop your CV here</div><div style="font-size:12px;color:#6b7390">PDF, DOCX or TXT · up to 10 MB</div></div>
+</div>
+<div class="sh" style="--c:#22b8ff">Import from link<i></i></div>
+<div class="sg">
+<div><span class="fl">LinkedIn profile URL</span><div class="fi" style="--c:#22b8ff">linkedin.com/in/janedoe</div></div>
+<div><span class="fl">Online CV / portfolio link</span><div class="fi" style="--c:#22b8ff">https://</div></div>
+</div>
+<div class="sh" style="--c:#22b8ff">Parsing options<i></i></div>
+<div class="sg">
+<div><span class="fl">Language</span><div class="fi" style="--c:#22b8ff">English</div></div>
+<div><span class="fl">Auto-fill sections</span><div class="fi" style="--c:#22b8ff">All sections</div></div>
+</div>
+<div class="sh" style="--c:#22b8ff">Document details<i></i></div>
+<div class="sg">
+<div><span class="fl">CV title</span><div class="fi" style="--c:#22b8ff">Jane Doe - Product Designer</div></div>
+<div><span class="fl">Target role</span><div class="fi" style="--c:#22b8ff">Senior Product Designer</div></div>
+<div><span class="fl">Visibility</span><div class="fi" style="--c:#22b8ff">Private</div></div>
+</div>
+<div class="sh" style="--c:#22b8ff">Privacy<i></i></div>
+<div class="sg">
+<div><span class="fl">Share with recruiters</span><div class="fi" style="--c:#22b8ff">Allowed</div></div>
+<div><span class="fl">Keep original file</span><div class="fi" style="--c:#22b8ff">Yes, store securely</div></div>
+</div>
+<div class="sh" style="--c:#22b8ff">File preferences<i></i></div>
+<div class="sg">
+<div><span class="fl">Preferred file format</span><div class="fi" style="--c:#22b8ff">PDF</div></div>
+<div><span class="fl">Maximum file size</span><div class="fi" style="--c:#22b8ff">10 MB</div></div>
+<div><span class="fl">Page limit</span><div class="fi" style="--c:#22b8ff">2 pages</div></div>
+<div><span class="fl">Document language</span><div class="fi" style="--c:#22b8ff">English</div></div>
+</div>
+<div class="sh" style="--c:#22b8ff">Parsing settings<i></i></div>
+<div class="sg">
+<div><span class="fl">Detect sections automatically</span><div class="fi" style="--c:#22b8ff">On</div></div>
+<div><span class="fl">Extract skills from text</span><div class="fi" style="--c:#22b8ff">On</div></div>
+<div><span class="fl">Extract dates and durations</span><div class="fi" style="--c:#22b8ff">On</div></div>
+<div><span class="fl">Merge with existing profile</span><div class="fi" style="--c:#22b8ff">Ask me first</div></div>
+</div>
+<div class="sh" style="--c:#22b8ff">Notes<i></i></div>
+<div class="sg">
+<div><span class="fl">Notes about this CV</span><div class="fi" style="--c:#22b8ff;height:90px;align-items:flex-start;padding-top:14px">Anything the parser should know, e.g. career gap, name change...</div></div>
+</div>
+</div><div id="s1" style="scroll-margin-top:210px;margin-top:30px"><div style="display:flex;align-items:center;gap:14px;margin:0 0 20px"><div style="flex:none;width:46px;height:46px;border-radius:50%;background:linear-gradient(180deg,#ffffffaa 0,#4d7bff 38%,#3556b2 100%);box-shadow:0 4px 0 #223772,0 0 14px #4d7bff;display:flex;align-items:center;justify-content:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg></div><div><div style="font-size:19px;font-weight:800;color:#0b1024">Profile Information</div><div style="font-size:12px;color:#6b7390;margin-top:2px">Step 2 of 9 · Tell us about yourself</div></div></div><div class="sh" style="--c:#4d7bff">Personal details<i></i></div>
+<div class="sg">
+<div><span class="fl">Full name</span><div class="fi" style="--c:#4d7bff">Jane Doe</div></div>
+<div><span class="fl">Headline</span><div class="fi" style="--c:#4d7bff">Product Designer</div></div>
+<div><span class="fl">Date of birth</span><div class="fi" style="--c:#4d7bff">DD / MM / YYYY</div></div>
+</div>
+<div class="sh" style="--c:#4d7bff">Contact<i></i></div>
+<div class="sg">
+<div><span class="fl">Email</span><div class="fi" style="--c:#4d7bff">jane@email.com</div></div>
+<div><span class="fl">Phone</span><div class="fi" style="--c:#4d7bff">+880 1700 000000</div></div>
+<div><span class="fl">Location</span><div class="fi" style="--c:#4d7bff">Dhaka, Bangladesh</div></div>
+</div>
+<div class="sh" style="--c:#4d7bff">Online presence<i></i></div>
+<div class="sg">
+<div><span class="fl">LinkedIn</span><div class="fi" style="--c:#4d7bff">linkedin.com/in/janedoe</div></div>
+<div><span class="fl">Portfolio website</span><div class="fi" style="--c:#4d7bff">janedoe.com</div></div>
+<div><span class="fl">GitHub</span><div class="fi" style="--c:#4d7bff">github.com/janedoe</div></div>
+</div>
+<div class="sh" style="--c:#4d7bff">About you<i></i></div>
+<div class="sg">
+<div><span class="fl">Professional summary</span><div class="fi" style="--c:#4d7bff;height:104px;align-items:flex-start;padding-top:14px">Write a short summary about your experience, strengths and goals...</div></div>
+</div>
+<div class="sh" style="--c:#4d7bff">Address<i></i></div>
+<div class="sg">
+<div><span class="fl">Street address</span><div class="fi" style="--c:#4d7bff">House 12, Road 5</div></div>
+<div><span class="fl">City</span><div class="fi" style="--c:#4d7bff">Dhaka</div></div>
+<div><span class="fl">Postal code</span><div class="fi" style="--c:#4d7bff">1212</div></div>
+<div><span class="fl">Country</span><div class="fi" style="--c:#4d7bff">Bangladesh</div></div>
+</div>
+<div class="sh" style="--c:#4d7bff">Preferences<i></i></div>
+<div class="sg">
+<div><span class="fl">Preferred contact method</span><div class="fi" style="--c:#4d7bff">Email</div></div>
+<div><span class="fl">Availability</span><div class="fi" style="--c:#4d7bff">Immediately</div></div>
+<div><span class="fl">Expected salary</span><div class="fi" style="--c:#4d7bff">$60,000 / year</div></div>
+</div>
+<div class="sh" style="--c:#4d7bff">Identity<i></i></div>
+<div class="sg">
+<div><span class="fl">Middle name</span><div class="fi" style="--c:#4d7bff">Ahmed</div></div>
+<div><span class="fl">Preferred name</span><div class="fi" style="--c:#4d7bff">Jane</div></div>
+<div><span class="fl">Gender</span><div class="fi" style="--c:#4d7bff">Female</div></div>
+<div><span class="fl">Nationality</span><div class="fi" style="--c:#4d7bff">Bangladeshi</div></div>
+<div><span class="fl">Marital status</span><div class="fi" style="--c:#4d7bff">Single</div></div>
+<div><span class="fl">Passport / ID number</span><div class="fi" style="--c:#4d7bff">XX0000000</div></div>
+</div>
+<div class="sh" style="--c:#4d7bff">Work authorisation<i></i></div>
+<div class="sg">
+<div><span class="fl">Work permit status</span><div class="fi" style="--c:#4d7bff">Citizen</div></div>
+<div><span class="fl">Willing to relocate</span><div class="fi" style="--c:#4d7bff">Yes</div></div>
+<div><span class="fl">Willing to travel</span><div class="fi" style="--c:#4d7bff">Up to 25%</div></div>
+<div><span class="fl">Notice period</span><div class="fi" style="--c:#4d7bff">30 days</div></div>
+</div>
+<div class="sh" style="--c:#4d7bff">Social links<i></i></div>
+<div class="sg">
+<div><span class="fl">Twitter / X</span><div class="fi" style="--c:#4d7bff">x.com/janedoe</div></div>
+<div><span class="fl">Behance</span><div class="fi" style="--c:#4d7bff">behance.net/janedoe</div></div>
+<div><span class="fl">Dribbble</span><div class="fi" style="--c:#4d7bff">dribbble.com/janedoe</div></div>
+<div><span class="fl">Medium</span><div class="fi" style="--c:#4d7bff">medium.com/@janedoe</div></div>
+</div>
+</div><div id="s2" style="scroll-margin-top:210px;margin-top:30px"><div style="display:flex;align-items:center;gap:14px;margin:0 0 20px"><div style="flex:none;width:46px;height:46px;border-radius:50%;background:linear-gradient(180deg,#ffffffaa 0,#9b5cff 38%,#6c40b2 100%);box-shadow:0 4px 0 #452972,0 0 14px #9b5cff;display:flex;align-items:center;justify-content:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/></svg></div><div><div style="font-size:19px;font-weight:800;color:#0b1024">Education</div><div style="font-size:12px;color:#6b7390;margin-top:2px">Step 3 of 9 · Your academic background</div></div></div><div class="sh" style="--c:#9b5cff">Degree<i></i></div>
+<div class="sg">
+<div><span class="fl">Institution</span><div class="fi" style="--c:#9b5cff">University of Dhaka</div></div>
+<div><span class="fl">Degree</span><div class="fi" style="--c:#9b5cff">Bachelor of Science</div></div>
+<div><span class="fl">Field of study</span><div class="fi" style="--c:#9b5cff">Computer Science</div></div>
+</div>
+<div class="sh" style="--c:#9b5cff">Duration<i></i></div>
+<div class="sg">
+<div><span class="fl">Start date</span><div class="fi" style="--c:#9b5cff">MM / YYYY</div></div>
+<div><span class="fl">End date</span><div class="fi" style="--c:#9b5cff">MM / YYYY</div></div>
+<div><span class="fl">Grade / CGPA</span><div class="fi" style="--c:#9b5cff">3.80 / 4.00</div></div>
+</div>
+<div class="sh" style="--c:#9b5cff">Details<i></i></div>
+<div class="sg">
+<div><span class="fl">Achievements & activities</span><div class="fi" style="--c:#9b5cff;height:104px;align-items:flex-start;padding-top:14px">Honors, clubs, thesis, relevant coursework...</div></div>
+</div>
+<div class="sh" style="--c:#9b5cff">Awards & honors<i></i></div>
+<div class="sg">
+<div><span class="fl">Award title</span><div class="fi" style="--c:#9b5cff">Dean's List</div></div>
+<div><span class="fl">Awarded by</span><div class="fi" style="--c:#9b5cff">University of Dhaka</div></div>
+<div><span class="fl">Year</span><div class="fi" style="--c:#9b5cff">2022</div></div>
+</div>
+<div class="sh" style="--c:#9b5cff">Courses<i></i></div>
+<div class="sg">
+<div><span class="fl">Course name</span><div class="fi" style="--c:#9b5cff">Machine Learning</div></div>
+<div><span class="fl">Platform</span><div class="fi" style="--c:#9b5cff">Coursera</div></div>
+<div><span class="fl">Completion date</span><div class="fi" style="--c:#9b5cff">MM / YYYY</div></div>
+</div>
+<div class="sh" style="--c:#9b5cff">Secondary education<i></i></div>
+<div class="sg">
+<div><span class="fl">School name</span><div class="fi" style="--c:#9b5cff">Dhaka College</div></div>
+<div><span class="fl">Board / curriculum</span><div class="fi" style="--c:#9b5cff">HSC</div></div>
+<div><span class="fl">Group / stream</span><div class="fi" style="--c:#9b5cff">Science</div></div>
+<div><span class="fl">Passing year</span><div class="fi" style="--c:#9b5cff">2018</div></div>
+<div><span class="fl">GPA</span><div class="fi" style="--c:#9b5cff">5.00 / 5.00</div></div>
+</div>
+<div class="sh" style="--c:#9b5cff">Postgraduate<i></i></div>
+<div class="sg">
+<div><span class="fl">Institution</span><div class="fi" style="--c:#9b5cff">BRAC University</div></div>
+<div><span class="fl">Degree</span><div class="fi" style="--c:#9b5cff">Master of Science</div></div>
+<div><span class="fl">Thesis title</span><div class="fi" style="--c:#9b5cff">Human-centred design systems</div></div>
+<div><span class="fl">Supervisor</span><div class="fi" style="--c:#9b5cff">Prof. A. Rahman</div></div>
+</div>
+<div class="sh" style="--c:#9b5cff">Extracurricular<i></i></div>
+<div class="sg">
+<div><span class="fl">Clubs & societies</span><div class="fi" style="--c:#9b5cff">Design Society, Robotics Club</div></div>
+<div><span class="fl">Volunteering</span><div class="fi" style="--c:#9b5cff">Teach For Bangladesh</div></div>
+<div><span class="fl">Other academic notes</span><div class="fi" style="--c:#9b5cff;height:90px;align-items:flex-start;padding-top:14px">Scholarships, exchange programs, publications...</div></div>
+</div>
+</div><div id="s3" style="scroll-margin-top:210px;margin-top:30px"><div style="display:flex;align-items:center;gap:14px;margin:0 0 20px"><div style="flex:none;width:46px;height:46px;border-radius:50%;background:linear-gradient(180deg,#ffffffaa 0,#ff2bd6 38%,#b21e95 100%);box-shadow:0 4px 0 #721360,0 0 14px #ff2bd6;display:flex;align-items:center;justify-content:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h7l2 2h9v11H3z"/></svg></div><div><div style="font-size:19px;font-weight:800;color:#0b1024">Projects</div><div style="font-size:12px;color:#6b7390;margin-top:2px">Step 4 of 9 · Show what you have built</div></div></div><div class="sh" style="--c:#ff2bd6">Project info<i></i></div>
+<div class="sg">
+<div><span class="fl">Project title</span><div class="fi" style="--c:#ff2bd6">Neon CV Builder</div></div>
+<div><span class="fl">Your role</span><div class="fi" style="--c:#ff2bd6">Lead Developer</div></div>
+<div><span class="fl">Project link</span><div class="fi" style="--c:#ff2bd6">github.com/janedoe/project</div></div>
+</div>
+<div class="sh" style="--c:#ff2bd6">Timeline<i></i></div>
+<div class="sg">
+<div><span class="fl">Start date</span><div class="fi" style="--c:#ff2bd6">MM / YYYY</div></div>
+<div><span class="fl">End date</span><div class="fi" style="--c:#ff2bd6">MM / YYYY</div></div>
+</div>
+<div class="sh" style="--c:#ff2bd6">Description<i></i></div>
+<div class="sg">
+<div><span class="fl">Technologies used</span><div class="fi" style="--c:#ff2bd6">React, Node.js, PostgreSQL</div></div>
+<div><span class="fl">What did you build?</span><div class="fi" style="--c:#ff2bd6;height:104px;align-items:flex-start;padding-top:14px">Describe the problem, your work and the result...</div></div>
+</div>
+<div class="sh" style="--c:#ff2bd6">Team & impact<i></i></div>
+<div class="sg">
+<div><span class="fl">Team size</span><div class="fi" style="--c:#ff2bd6">5</div></div>
+<div><span class="fl">Key result</span><div class="fi" style="--c:#ff2bd6">Reached 10,000 users</div></div>
+<div><span class="fl">Client / company</span><div class="fi" style="--c:#ff2bd6">Acme Inc.</div></div>
+</div>
+<div class="sh" style="--c:#ff2bd6">Media<i></i></div>
+<div class="sg">
+<div><span class="fl">Live demo link</span><div class="fi" style="--c:#ff2bd6">https://demo.example.com</div></div>
+<div><span class="fl">Screenshot URL</span><div class="fi" style="--c:#ff2bd6">https://img.example.com/shot.png</div></div>
+</div>
+<div class="sh" style="--c:#ff2bd6">Project details<i></i></div>
+<div class="sg">
+<div><span class="fl">Project category</span><div class="fi" style="--c:#ff2bd6">Web application</div></div>
+<div><span class="fl">Project status</span><div class="fi" style="--c:#ff2bd6">Completed</div></div>
+<div><span class="fl">Client</span><div class="fi" style="--c:#ff2bd6">Acme Inc.</div></div>
+<div><span class="fl">Budget</span><div class="fi" style="--c:#ff2bd6">$20,000</div></div>
+<div><span class="fl">Duration</span><div class="fi" style="--c:#ff2bd6">6 months</div></div>
+</div>
+<div class="sh" style="--c:#ff2bd6">Contribution<i></i></div>
+<div class="sg">
+<div><span class="fl">Responsibilities</span><div class="fi" style="--c:#ff2bd6">Design, frontend, testing</div></div>
+<div><span class="fl">Methodology</span><div class="fi" style="--c:#ff2bd6">Agile / Scrum</div></div>
+<div><span class="fl">Version control</span><div class="fi" style="--c:#ff2bd6">Git / GitHub</div></div>
+<div><span class="fl">Hosting platform</span><div class="fi" style="--c:#ff2bd6">AWS</div></div>
+</div>
+<div class="sh" style="--c:#ff2bd6">Outcomes<i></i></div>
+<div class="sg">
+<div><span class="fl">Users reached</span><div class="fi" style="--c:#ff2bd6">10,000+</div></div>
+<div><span class="fl">Revenue impact</span><div class="fi" style="--c:#ff2bd6">+18%</div></div>
+<div><span class="fl">Awards or recognition</span><div class="fi" style="--c:#ff2bd6">Best Product 2023</div></div>
+<div><span class="fl">Lessons learned</span><div class="fi" style="--c:#ff2bd6;height:90px;align-items:flex-start;padding-top:14px">What went well and what you would do differently...</div></div>
+</div>
+</div><div id="s4" style="scroll-margin-top:210px;margin-top:30px"><div style="display:flex;align-items:center;gap:14px;margin:0 0 20px"><div style="flex:none;width:46px;height:46px;border-radius:50%;background:linear-gradient(180deg,#ffffffaa 0,#ff3d6e 38%,#b22a4d 100%);box-shadow:0 4px 0 #721b31,0 0 14px #ff3d6e;display:flex;align-items:center;justify-content:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V4h6v3M3 13h18"/></svg></div><div><div style="font-size:19px;font-weight:800;color:#0b1024">Work Experience</div><div style="font-size:12px;color:#6b7390;margin-top:2px">Step 5 of 9 · Where you have worked</div></div></div><div class="sh" style="--c:#ff3d6e">Position<i></i></div>
+<div class="sg">
+<div><span class="fl">Job title</span><div class="fi" style="--c:#ff3d6e">Senior Product Designer</div></div>
+<div><span class="fl">Company</span><div class="fi" style="--c:#ff3d6e">Acme Inc.</div></div>
+<div><span class="fl">Location</span><div class="fi" style="--c:#ff3d6e">Dhaka, Bangladesh</div></div>
+</div>
+<div class="sh" style="--c:#ff3d6e">Duration<i></i></div>
+<div class="sg">
+<div><span class="fl">Start date</span><div class="fi" style="--c:#ff3d6e">MM / YYYY</div></div>
+<div><span class="fl">End date</span><div class="fi" style="--c:#ff3d6e">Present</div></div>
+<div><span class="fl">Employment type</span><div class="fi" style="--c:#ff3d6e">Full-time</div></div>
+</div>
+<div class="sh" style="--c:#ff3d6e">Responsibilities<i></i></div>
+<div class="sg">
+<div><span class="fl">Key achievements</span><div class="fi" style="--c:#ff3d6e;height:104px;align-items:flex-start;padding-top:14px">Led a team of 5, increased conversion by 32%...</div></div>
+</div>
+<div class="sh" style="--c:#ff3d6e">Tools & team<i></i></div>
+<div class="sg">
+<div><span class="fl">Tools used</span><div class="fi" style="--c:#ff3d6e">Figma, React, Jira</div></div>
+<div><span class="fl">Team size</span><div class="fi" style="--c:#ff3d6e">8</div></div>
+<div><span class="fl">Reported to</span><div class="fi" style="--c:#ff3d6e">Head of Design</div></div>
+</div>
+<div class="sh" style="--c:#ff3d6e">Reference<i></i></div>
+<div class="sg">
+<div><span class="fl">Referee name</span><div class="fi" style="--c:#ff3d6e">Sarah Khan</div></div>
+<div><span class="fl">Referee email</span><div class="fi" style="--c:#ff3d6e">sarah@acme.com</div></div>
+<div><span class="fl">Referee phone</span><div class="fi" style="--c:#ff3d6e">+880 1800 000000</div></div>
+</div>
+<div class="sh" style="--c:#ff3d6e">Company details<i></i></div>
+<div class="sg">
+<div><span class="fl">Company website</span><div class="fi" style="--c:#ff3d6e">acme.com</div></div>
+<div><span class="fl">Industry</span><div class="fi" style="--c:#ff3d6e">Software / SaaS</div></div>
+<div><span class="fl">Company size</span><div class="fi" style="--c:#ff3d6e">201 - 500 employees</div></div>
+<div><span class="fl">Department</span><div class="fi" style="--c:#ff3d6e">Design & Product</div></div>
+</div>
+<div class="sh" style="--c:#ff3d6e">Compensation<i></i></div>
+<div class="sg">
+<div><span class="fl">Starting salary</span><div class="fi" style="--c:#ff3d6e">$45,000</div></div>
+<div><span class="fl">Final salary</span><div class="fi" style="--c:#ff3d6e">$60,000</div></div>
+<div><span class="fl">Bonuses</span><div class="fi" style="--c:#ff3d6e">10% annual</div></div>
+<div><span class="fl">Reason for leaving</span><div class="fi" style="--c:#ff3d6e">Career growth</div></div>
+</div>
+<div class="sh" style="--c:#ff3d6e">Role scope<i></i></div>
+<div class="sg">
+<div><span class="fl">Employment status</span><div class="fi" style="--c:#ff3d6e">Full-time, on-site</div></div>
+<div><span class="fl">Direct reports</span><div class="fi" style="--c:#ff3d6e">5</div></div>
+<div><span class="fl">Budget owned</span><div class="fi" style="--c:#ff3d6e">$150,000</div></div>
+<div><span class="fl">Key tools</span><div class="fi" style="--c:#ff3d6e">Figma, Jira, Notion</div></div>
+<div><span class="fl">Major accomplishments</span><div class="fi" style="--c:#ff3d6e;height:90px;align-items:flex-start;padding-top:14px">Shipped 3 products, reduced churn by 14%...</div></div>
+</div>
+</div><div id="s5" style="scroll-margin-top:210px;margin-top:30px"><div style="display:flex;align-items:center;gap:14px;margin:0 0 20px"><div style="flex:none;width:46px;height:46px;border-radius:50%;background:linear-gradient(180deg,#ffffffaa 0,#ff8a1f 38%,#b26015 100%);box-shadow:0 4px 0 #723e0d,0 0 14px #ff8a1f;display:flex;align-items:center;justify-content:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M8.5 14L7 22l5-3 5 3-1.5-8"/></svg></div><div><div style="font-size:19px;font-weight:800;color:#0b1024">Certifications</div><div style="font-size:12px;color:#6b7390;margin-top:2px">Step 6 of 9 · Licences and credentials</div></div></div><div class="sh" style="--c:#ff8a1f">Certificate<i></i></div>
+<div class="sg">
+<div><span class="fl">Certification name</span><div class="fi" style="--c:#ff8a1f">AWS Certified Developer</div></div>
+<div><span class="fl">Issuing organisation</span><div class="fi" style="--c:#ff8a1f">Amazon Web Services</div></div>
+<div><span class="fl">Credential ID</span><div class="fi" style="--c:#ff8a1f">ABC-123-XYZ</div></div>
+</div>
+<div class="sh" style="--c:#ff8a1f">Validity<i></i></div>
+<div class="sg">
+<div><span class="fl">Issue date</span><div class="fi" style="--c:#ff8a1f">MM / YYYY</div></div>
+<div><span class="fl">Expiry date</span><div class="fi" style="--c:#ff8a1f">MM / YYYY</div></div>
+</div>
+<div class="sh" style="--c:#ff8a1f">Verification<i></i></div>
+<div class="sg">
+<div><span class="fl">Credential URL</span><div class="fi" style="--c:#ff8a1f">https://verify.example.com/abc</div></div>
+</div>
+<div class="sh" style="--c:#ff8a1f">Skills covered<i></i></div>
+<div class="sg">
+<div><span class="fl">Topics covered</span><div class="fi" style="--c:#ff8a1f">Cloud, Serverless, Security</div></div>
+<div><span class="fl">Score / grade</span><div class="fi" style="--c:#ff8a1f">92%</div></div>
+</div>
+<div class="sh" style="--c:#ff8a1f">Notes<i></i></div>
+<div class="sg">
+<div><span class="fl">Additional notes</span><div class="fi" style="--c:#ff8a1f;height:90px;align-items:flex-start;padding-top:14px">Anything employers should know about this credential...</div></div>
+</div>
+<div class="sh" style="--c:#ff8a1f">Issuer details<i></i></div>
+<div class="sg">
+<div><span class="fl">Issuer website</span><div class="fi" style="--c:#ff8a1f">aws.amazon.com</div></div>
+<div><span class="fl">Issuer country</span><div class="fi" style="--c:#ff8a1f">United States</div></div>
+<div><span class="fl">Certificate level</span><div class="fi" style="--c:#ff8a1f">Associate</div></div>
+<div><span class="fl">Exam code</span><div class="fi" style="--c:#ff8a1f">DVA-C02</div></div>
+</div>
+<div class="sh" style="--c:#ff8a1f">Training<i></i></div>
+<div class="sg">
+<div><span class="fl">Training provider</span><div class="fi" style="--c:#ff8a1f">A Cloud Guru</div></div>
+<div><span class="fl">Study hours</span><div class="fi" style="--c:#ff8a1f">80</div></div>
+<div><span class="fl">Exam date</span><div class="fi" style="--c:#ff8a1f">MM / YYYY</div></div>
+<div><span class="fl">Retake count</span><div class="fi" style="--c:#ff8a1f">0</div></div>
+</div>
+<div class="sh" style="--c:#ff8a1f">Renewal<i></i></div>
+<div class="sg">
+<div><span class="fl">Renewal required</span><div class="fi" style="--c:#ff8a1f">Every 3 years</div></div>
+<div><span class="fl">Renewal date</span><div class="fi" style="--c:#ff8a1f">MM / YYYY</div></div>
+<div><span class="fl">Continuing education credits</span><div class="fi" style="--c:#ff8a1f">20 CPE</div></div>
+<div><span class="fl">Certificate status</span><div class="fi" style="--c:#ff8a1f">Active</div></div>
+</div>
+</div><div id="s6" style="scroll-margin-top:210px;margin-top:30px"><div style="display:flex;align-items:center;gap:14px;margin:0 0 20px"><div style="flex:none;width:46px;height:46px;border-radius:50%;background:linear-gradient(180deg,#ffffffaa 0,#f2c200 38%,#a98700 100%);box-shadow:0 4px 0 #6c5700,0 0 14px #f2c200;display:flex;align-items:center;justify-content:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></div><div><div style="font-size:19px;font-weight:800;color:#0b1024">Skills</div><div style="font-size:12px;color:#6b7390;margin-top:2px">Step 7 of 9 · What you are good at</div></div></div><div class="sh" style="--c:#f2c200">Technical skills<i></i></div>
+<div class="sg">
+<div><span class="fl">Skill</span><div class="fi" style="--c:#f2c200">JavaScript</div></div>
+<div><span class="fl">Proficiency</span><div class="fi" style="--c:#f2c200">Expert</div></div>
+<div><span class="fl">Years of experience</span><div class="fi" style="--c:#f2c200">6</div></div>
+</div>
+<div class="sh" style="--c:#f2c200">Soft skills<i></i></div>
+<div class="sg">
+<div><span class="fl">Skill</span><div class="fi" style="--c:#f2c200">Leadership</div></div>
+<div><span class="fl">Proficiency</span><div class="fi" style="--c:#f2c200">Advanced</div></div>
+</div>
+<div class="sh" style="--c:#f2c200">Languages<i></i></div>
+<div class="sg">
+<div><span class="fl">Language</span><div class="fi" style="--c:#f2c200">English</div></div>
+<div><span class="fl">Level</span><div class="fi" style="--c:#f2c200">Fluent</div></div>
+</div>
+<div class="sh" style="--c:#f2c200">Tools & frameworks<i></i></div>
+<div class="sg">
+<div><span class="fl">Tool</span><div class="fi" style="--c:#f2c200">React</div></div>
+<div><span class="fl">Level</span><div class="fi" style="--c:#f2c200">Advanced</div></div>
+<div><span class="fl">Years of experience</span><div class="fi" style="--c:#f2c200">4</div></div>
+</div>
+<div class="sh" style="--c:#f2c200">Strengths summary<i></i></div>
+<div class="sg">
+<div><span class="fl">Describe your top strengths</span><div class="fi" style="--c:#f2c200;height:90px;align-items:flex-start;padding-top:14px">What makes you stand out in your field...</div></div>
+</div>
+<div class="sh" style="--c:#f2c200">Programming languages<i></i></div>
+<div class="sg">
+<div><span class="fl">Language</span><div class="fi" style="--c:#f2c200">TypeScript</div></div>
+<div><span class="fl">Proficiency</span><div class="fi" style="--c:#f2c200">Advanced</div></div>
+<div><span class="fl">Years of experience</span><div class="fi" style="--c:#f2c200">5</div></div>
+<div><span class="fl">Last used</span><div class="fi" style="--c:#f2c200">This year</div></div>
+</div>
+<div class="sh" style="--c:#f2c200">Design & tools<i></i></div>
+<div class="sg">
+<div><span class="fl">Tool</span><div class="fi" style="--c:#f2c200">Figma</div></div>
+<div><span class="fl">Proficiency</span><div class="fi" style="--c:#f2c200">Expert</div></div>
+<div><span class="fl">Years of experience</span><div class="fi" style="--c:#f2c200">6</div></div>
+<div><span class="fl">Last used</span><div class="fi" style="--c:#f2c200">This year</div></div>
+</div>
+<div class="sh" style="--c:#f2c200">Interpersonal skills<i></i></div>
+<div class="sg">
+<div><span class="fl">Communication</span><div class="fi" style="--c:#f2c200">Excellent</div></div>
+<div><span class="fl">Teamwork</span><div class="fi" style="--c:#f2c200">Excellent</div></div>
+<div><span class="fl">Problem solving</span><div class="fi" style="--c:#f2c200">Advanced</div></div>
+<div><span class="fl">Time management</span><div class="fi" style="--c:#f2c200">Advanced</div></div>
+<div><span class="fl">Adaptability</span><div class="fi" style="--c:#f2c200">Advanced</div></div>
+</div>
+<div class="sh" style="--c:#f2c200">Languages<i></i></div>
+<div class="sg">
+<div><span class="fl">Second language</span><div class="fi" style="--c:#f2c200">Bengali</div></div>
+<div><span class="fl">Proficiency level</span><div class="fi" style="--c:#f2c200">Native</div></div>
+<div><span class="fl">Third language</span><div class="fi" style="--c:#f2c200">Hindi</div></div>
+<div><span class="fl">Proficiency level</span><div class="fi" style="--c:#f2c200">Conversational</div></div>
+</div>
+</div><div id="s7" style="scroll-margin-top:210px;margin-top:30px"><div style="display:flex;align-items:center;gap:14px;margin:0 0 20px"><div style="flex:none;width:46px;height:46px;border-radius:50%;background:linear-gradient(180deg,#ffffffaa 0,#7ddc1f 38%,#579a15 100%);box-shadow:0 4px 0 #38630d,0 0 14px #7ddc1f;display:flex;align-items:center;justify-content:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div><div><div style="font-size:19px;font-weight:800;color:#0b1024">Cover Letter</div><div style="font-size:12px;color:#6b7390;margin-top:2px">Step 8 of 9 · Introduce yourself to employers</div></div></div><div class="sh" style="--c:#7ddc1f">Recipient<i></i></div>
+<div class="sg">
+<div><span class="fl">Hiring manager name</span><div class="fi" style="--c:#7ddc1f">Mr. John Smith</div></div>
+<div><span class="fl">Company name</span><div class="fi" style="--c:#7ddc1f">Acme Inc.</div></div>
+<div><span class="fl">Job title applying for</span><div class="fi" style="--c:#7ddc1f">Product Designer</div></div>
+</div>
+<div class="sh" style="--c:#7ddc1f">Letter<i></i></div>
+<div class="sg">
+<div><span class="fl">Subject line</span><div class="fi" style="--c:#7ddc1f">Application for Product Designer</div></div>
+<div><span class="fl">Letter body</span><div class="fi" style="--c:#7ddc1f;height:190px;align-items:flex-start;padding-top:14px">Dear Mr. Smith, I am excited to apply for...</div></div>
+</div>
+<div class="sh" style="--c:#7ddc1f">Tone<i></i></div>
+<div class="sg">
+<div><span class="fl">Writing tone</span><div class="fi" style="--c:#7ddc1f">Professional</div></div>
+<div><span class="fl">Length</span><div class="fi" style="--c:#7ddc1f">Medium</div></div>
+</div>
+<div class="sh" style="--c:#7ddc1f">Opening<i></i></div>
+<div class="sg">
+<div><span class="fl">Greeting</span><div class="fi" style="--c:#7ddc1f">Dear Mr. Smith,</div></div>
+<div><span class="fl">Opening hook</span><div class="fi" style="--c:#7ddc1f;height:90px;align-items:flex-start;padding-top:14px">I was thrilled to see your opening for...</div></div>
+</div>
+<div class="sh" style="--c:#7ddc1f">Closing<i></i></div>
+<div class="sg">
+<div><span class="fl">Closing line</span><div class="fi" style="--c:#7ddc1f">Thank you for your time and consideration.</div></div>
+<div><span class="fl">Signature name</span><div class="fi" style="--c:#7ddc1f">Jane Doe</div></div>
+<div><span class="fl">Contact line</span><div class="fi" style="--c:#7ddc1f">jane@email.com · +880 1700 000000</div></div>
+</div>
+<div class="sh" style="--c:#7ddc1f">Sender details<i></i></div>
+<div class="sg">
+<div><span class="fl">Your full name</span><div class="fi" style="--c:#7ddc1f">Jane Doe</div></div>
+<div><span class="fl">Your address</span><div class="fi" style="--c:#7ddc1f">House 12, Road 5, Dhaka</div></div>
+<div><span class="fl">Your email</span><div class="fi" style="--c:#7ddc1f">jane@email.com</div></div>
+<div><span class="fl">Your phone</span><div class="fi" style="--c:#7ddc1f">+880 1700 000000</div></div>
+<div><span class="fl">Date</span><div class="fi" style="--c:#7ddc1f">23 Nov 2026</div></div>
+</div>
+<div class="sh" style="--c:#7ddc1f">Recipient details<i></i></div>
+<div class="sg">
+<div><span class="fl">Company address</span><div class="fi" style="--c:#7ddc1f">Level 4, Tower A, Gulshan</div></div>
+<div><span class="fl">Hiring manager title</span><div class="fi" style="--c:#7ddc1f">Head of Design</div></div>
+<div><span class="fl">Job reference number</span><div class="fi" style="--c:#7ddc1f">REF-2026-118</div></div>
+<div><span class="fl">Where you found the role</span><div class="fi" style="--c:#7ddc1f">LinkedIn</div></div>
+</div>
+<div class="sh" style="--c:#7ddc1f">Highlights<i></i></div>
+<div class="sg">
+<div><span class="fl">Key achievement 1</span><div class="fi" style="--c:#7ddc1f;height:90px;align-items:flex-start;padding-top:14px">Increased conversion by 32% through a checkout redesign...</div></div>
+<div><span class="fl">Key achievement 2</span><div class="fi" style="--c:#7ddc1f;height:90px;align-items:flex-start;padding-top:14px">Led a team of 5 to launch a design system...</div></div>
+<div><span class="fl">Why this company</span><div class="fi" style="--c:#7ddc1f">Mission and product culture</div></div>
+</div>
+</div><div id="s8" style="scroll-margin-top:210px;margin-top:30px"><div style="display:flex;align-items:center;gap:14px;margin:0 0 20px"><div style="flex:none;width:46px;height:46px;border-radius:50%;background:linear-gradient(180deg,#ffffffaa 0,#00d68f 38%,#009564 100%);box-shadow:0 4px 0 #006040,0 0 14px #00d68f;display:flex;align-items:center;justify-content:center"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#0b1024" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div><div><div style="font-size:19px;font-weight:800;color:#0b1024">CV Preview</div><div style="font-size:12px;color:#6b7390;margin-top:2px">Step 9 of 9 · Review and download</div></div></div><div class="sh" style="--c:#00d68f">Preview<i></i></div>
+<div class="sg">
+<div style="height:330px;border-radius:16px;background:#f3f5fb;box-shadow:inset 0 3px 8px rgba(11,16,36,.10),0 0 12px #00d68f;border:1.5px solid #00d68f;display:flex;align-items:center;justify-content:center"><div style="width:230px;height:290px;background:#fff;border-radius:6px;box-shadow:0 6px 0 #006040,0 12px 16px rgba(0,0,0,.2),0 0 16px #00d68f;padding:22px;box-sizing:border-box"><div style="height:14px;width:55%;border-radius:4px;background:linear-gradient(90deg,#00d68f,#9b5cff)"></div><div style="height:8px;width:35%;border-radius:4px;background:#c9cfe4;margin-top:8px"></div><div style="height:8px;border-radius:4px;background:#dfe3f0;width:90%;margin-top:10px"></div><div style="height:8px;border-radius:4px;background:#dfe3f0;width:75%;margin-top:10px"></div><div style="height:8px;border-radius:4px;background:#dfe3f0;width:85%;margin-top:10px"></div><div style="height:8px;border-radius:4px;background:#dfe3f0;width:60%;margin-top:10px"></div><div style="height:8px;border-radius:4px;background:#dfe3f0;width:80%;margin-top:10px"></div><div style="height:8px;border-radius:4px;background:#dfe3f0;width:70%;margin-top:10px"></div><div style="height:8px;border-radius:4px;background:#dfe3f0;width:88%;margin-top:10px"></div><div style="height:8px;border-radius:4px;background:#dfe3f0;width:55%;margin-top:10px"></div></div></div>
+</div>
+<div class="sh" style="--c:#00d68f">Template<i></i></div>
+<div class="sg">
+<div><span class="fl">Template style</span><div class="fi" style="--c:#00d68f">Neon Modern</div></div>
+<div><span class="fl">Accent colour</span><div class="fi" style="--c:#00d68f">Electric blue</div></div>
+</div>
+<div class="sh" style="--c:#00d68f">Download<i></i></div>
+<div class="sg">
+<div><span class="fl">File format</span><div class="fi" style="--c:#00d68f">PDF</div></div>
+<div><span class="fl">File name</span><div class="fi" style="--c:#00d68f">Jane_Doe_CV</div></div>
+</div>
+<div class="sh" style="--c:#00d68f">Sections to include<i></i></div>
+<div class="sg">
+<div><span class="fl">Education</span><div class="fi" style="--c:#00d68f">Show</div></div>
+<div><span class="fl">Projects</span><div class="fi" style="--c:#00d68f">Show</div></div>
+<div><span class="fl">Certifications</span><div class="fi" style="--c:#00d68f">Show</div></div>
+<div><span class="fl">Cover letter</span><div class="fi" style="--c:#00d68f">Attach</div></div>
+</div>
+<div class="sh" style="--c:#00d68f">Sharing<i></i></div>
+<div class="sg">
+<div><span class="fl">Public link</span><div class="fi" style="--c:#00d68f">https://cv.example.com/janedoe</div></div>
+<div><span class="fl">Password protection</span><div class="fi" style="--c:#00d68f">Off</div></div>
+</div>
+<div class="sh" style="--c:#00d68f">Layout<i></i></div>
+<div class="sg">
+<div><span class="fl">Page size</span><div class="fi" style="--c:#00d68f">A4</div></div>
+<div><span class="fl">Margins</span><div class="fi" style="--c:#00d68f">Normal</div></div>
+<div><span class="fl">Font family</span><div class="fi" style="--c:#00d68f">Inter</div></div>
+<div><span class="fl">Font size</span><div class="fi" style="--c:#00d68f">11 pt</div></div>
+<div><span class="fl">Line spacing</span><div class="fi" style="--c:#00d68f">1.15</div></div>
+</div>
+<div class="sh" style="--c:#00d68f">Style<i></i></div>
+<div class="sg">
+<div><span class="fl">Primary colour</span><div class="fi" style="--c:#00d68f">#22b8ff</div></div>
+<div><span class="fl">Heading style</span><div class="fi" style="--c:#00d68f">Bold, uppercase</div></div>
+<div><span class="fl">Photo</span><div class="fi" style="--c:#00d68f">Include, circular</div></div>
+<div><span class="fl">Icons</span><div class="fi" style="--c:#00d68f">Show</div></div>
+</div>
+<div class="sh" style="--c:#00d68f">Content checks<i></i></div>
+<div class="sg">
+<div><span class="fl">Spelling check</span><div class="fi" style="--c:#00d68f">Passed</div></div>
+<div><span class="fl">Missing sections</span><div class="fi" style="--c:#00d68f">None</div></div>
+<div><span class="fl">ATS compatibility</span><div class="fi" style="--c:#00d68f">92% score</div></div>
+<div><span class="fl">Page count</span><div class="fi" style="--c:#00d68f">2 pages</div></div>
+<div><span class="fl">Last saved</span><div class="fi" style="--c:#00d68f">Today, 6:55 PM</div></div>
+</div>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:18px;margin-top:34px">
+<div class="fb" style="width:140px;background:#fff;border:1.5px solid #4d7bff;box-shadow:0 5px 0 #223772,0 0 12px #4d7bff">Back</div>
+<div class="fb" style="width:240px;background:linear-gradient(180deg,#ffffffaa 0,#00d68f 38%,#009564 100%);box-shadow:0 5px 0 #006040,0 10px 10px rgba(0,0,0,.25),0 0 16px #00d68f">Submit CV</div>
+</div>
+</div>
+</div>
+
+<script>
+var C=["#22b8ff", "#4d7bff", "#9b5cff", "#ff2bd6", "#ff3d6e", "#ff8a1f", "#f2c200", "#7ddc1f", "#00d68f"],S=["#1780b2", "#3556b2", "#6c40b2", "#b21e95", "#b22a4d", "#b26015", "#a98700", "#579a15", "#009564"],D=["#0f5272", "#223772", "#452972", "#721360", "#721b31", "#723e0d", "#6c5700", "#38630d", "#006040"];
+var btn=document.getElementById('uptop');
+function upd(){var k=0;for(var i=0;i<9;i++){var e=document.getElementById('s'+i);if(e&&e.getBoundingClientRect().top<=240)k=i;}
+var tabs=document.querySelectorAll('.tb');for(var t=0;t<tabs.length;t++)tabs[t].classList.toggle('on',t===k);if(k!==last){last=k;ctr(k);}btn.style.borderColor=C[k];btn.querySelector('svg').setAttribute('stroke',C[k]);
+btn.style.boxShadow='0 5px 0 '+D[k]+',0 10px 12px rgba(0,0,0,.18),0 0 16px '+C[k];}
+function ctr(i){var bar=document.getElementById('tabbar');var el=document.querySelectorAll('.tb')[i];if(bar&&el)bar.scrollTo({left:el.offsetLeft+82-bar.clientWidth/2,behavior:'smooth'});}
+document.querySelectorAll('.tb').forEach(function(el,i){el.addEventListener('click',function(){ctr(i);});});
+var last=-1;
+document.addEventListener('scroll',upd,true);window.addEventListener('resize',upd);upd();
+</script>
+</body>
+</html>
