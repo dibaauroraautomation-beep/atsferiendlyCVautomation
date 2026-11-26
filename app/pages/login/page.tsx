@@ -1,24 +1,19 @@
 "use client";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 /* ------------------------------------------------------------------ */
 /* Config                                                              */
 /* ------------------------------------------------------------------ */
-// Login + registration now go through Supabase.
-// n8n is only used to ANALYZE the CV in automated registration.
+// Login + registration go through Supabase.
+// n8n is only notified after an automated registration.
 const WEBHOOK_BASE = "https://n8naurora.duckdns.org/webhook";
 const AUTO_REGISTER_URL = `${WEBHOOK_BASE}/info-extract`;
-
-const CV_BUCKET = "cvs";
 
 // Where each type of user lands after login
 const MANUAL_HOME = "/pages/Dashboard";
 const AUTOMATED_HOME = "/pages/automatic-Dashboard";
-
-const ALLOWED_EXT = [".pdf", ".doc", ".docx"];
-const MAX_FILE_MB = 5;
 
 const inputCls =
   "w-full px-3 py-2 text-sm text-slate-800 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 placeholder:text-slate-400";
@@ -28,22 +23,6 @@ type Msg = { text: string; type: "success" | "error" } | null;
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
-const validateFile = (file: File): string | null => {
-  const name = file.name.toLowerCase();
-  if (!ALLOWED_EXT.some((ext) => name.endsWith(ext))) {
-    return "Unsupported file type. Upload a PDF, DOC or DOCX file.";
-  }
-  if (file.size > MAX_FILE_MB * 1024 * 1024) {
-    return `File is too large. The maximum size is ${MAX_FILE_MB} MB.`;
-  }
-  return null;
-};
-
-const formatSize = (bytes: number) =>
-  bytes < 1024 * 1024
-    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
-    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-
 function MessageBox({ msg }: { msg: Msg }) {
   if (!msg) return null;
   return (
@@ -144,6 +123,7 @@ export default function LoginPage() {
   const [lastName, setLastName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
+  const [regConfirm, setRegConfirm] = useState("");
   const [language, setLanguage] = useState("");
   const [agree, setAgree] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -153,14 +133,11 @@ export default function LoginPage() {
   const [autoFullName, setAutoFullName] = useState("");
   const [autoEmail, setAutoEmail] = useState("");
   const [autoPassword, setAutoPassword] = useState("");
+  const [autoConfirm, setAutoConfirm] = useState("");
   const [autoLanguage, setAutoLanguage] = useState("");
   const [autoAgree, setAutoAgree] = useState(false);
   const [autoSubmitting, setAutoSubmitting] = useState(false);
   const [autoMsg, setAutoMsg] = useState<Msg>(null);
-  const [cvFile, setCvFile] = useState<File | null>(null);
-  const [cvError, setCvError] = useState("");
-  const [dragActive, setDragActive] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* ---------------- Reset everything ---------------- */
   const resetAll = () => {
@@ -174,6 +151,7 @@ export default function LoginPage() {
     setLastName("");
     setRegEmail("");
     setRegPassword("");
+    setRegConfirm("");
     setLanguage("");
     setAgree(false);
     setRegMsg(null);
@@ -181,12 +159,10 @@ export default function LoginPage() {
     setAutoFullName("");
     setAutoEmail("");
     setAutoPassword("");
+    setAutoConfirm("");
     setAutoLanguage("");
     setAutoAgree(false);
     setAutoMsg(null);
-    setCvFile(null);
-    setCvError("");
-    setDragActive(false);
   };
 
   const toggle = () => {
@@ -196,7 +172,7 @@ export default function LoginPage() {
 
   /** After a successful sign-up, send the user to the login form. */
   const goToLogin = async (email: string, hasSession: boolean) => {
-    // Your flow is "register, then log in", so end the auto-created session.
+    // Flow is "register, then log in", so end the auto-created session.
     if (hasSession) await supabase.auth.signOut();
     resetAll();
     setIsRegister(false);
@@ -225,7 +201,7 @@ export default function LoginPage() {
       return;
     }
 
-    // Decide which dashboard to open.
+    // Which section did this user register from?
     // 1st choice: the "profiles" table. Fallback: the metadata saved at sign-up.
     let registrationType: string | undefined = data.user.user_metadata?.registration_type;
     const { data: profile } = await supabase
@@ -235,15 +211,28 @@ export default function LoginPage() {
       .single();
     if (profile?.registration_type) registrationType = profile.registration_type;
 
+    // Save the type so the sidebar/layout can show only that section's pages
+    const type = registrationType === "automated" ? "automated" : "manual";
+    try {
+      localStorage.setItem("registrationType", type);
+      document.cookie = `registration_type=${type}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+    } catch {
+      /* storage blocked: the layout can still read user_metadata */
+    }
+
     setLoginLoading(false);
     setLoginMsg({ text: "Logged in", type: "success" });
-    router.replace(registrationType === "automated" ? AUTOMATED_HOME : MANUAL_HOME);
+    router.replace(type === "automated" ? AUTOMATED_HOME : MANUAL_HOME);
     router.refresh();
   };
 
   /* ---------------- Manual registration ---------------- */
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (regPassword !== regConfirm) {
+      setRegMsg({ text: "Passwords do not match.", type: "error" });
+      return;
+    }
     setSubmitting(true);
     setRegMsg(null);
 
@@ -278,52 +267,11 @@ export default function LoginPage() {
     await goToLogin(email, !!data.session);
   };
 
-  /* ---------------- Automated registration ---------------- */
-  const handleFile = (file: File) => {
-    const error = validateFile(file);
-    if (error) {
-      setCvFile(null);
-      setCvError(error);
-      return;
-    }
-    setCvFile(file);
-    setCvError("");
-    setAutoMsg(null);
-  };
-
-  const removeFile = () => {
-    setCvFile(null);
-    setCvError("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFile(file);
-  };
-
-  const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragActive(true);
-  };
-
-  const onDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-    setDragActive(false);
-  };
-
-  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragActive(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleFile(file);
-  };
-
+  /* ---------------- Automated registration (no CV needed) ---------------- */
   const handleAutoRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cvFile) {
-      setCvError("Upload your CV to continue.");
+    if (autoPassword !== autoConfirm) {
+      setAutoMsg({ text: "Passwords do not match.", type: "error" });
       return;
     }
     setAutoSubmitting(true);
@@ -359,26 +307,8 @@ export default function LoginPage() {
     }
 
     const userId = data.user?.id ?? "";
-    let cvPath = "";
 
-    // 2) Upload the CV into the user's own folder: cvs/<userId>/<file>
-    //    Only possible when sign-up returned a session (email confirmation OFF).
-    if (data.session && userId) {
-      const safeName = cvFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `${userId}/${Date.now()}_${safeName}`;
-      const { error: uploadError } = await supabase.storage
-        .from(CV_BUCKET)
-        .upload(path, cvFile, { upsert: true, contentType: cvFile.type || undefined });
-
-      if (uploadError) {
-        console.error("CV upload failed:", uploadError.message);
-      } else {
-        cvPath = path;
-        await supabase.from("profiles").update({ cv_path: path }).eq("id", userId);
-      }
-    }
-
-    // 3) Send the CV to n8n for analysis (no password is sent anymore)
+    // 2) Notify n8n (account is already created, so a failure here does not block the user)
     try {
       const formData = new FormData();
       formData.append("user id", userId);
@@ -389,12 +319,9 @@ export default function LoginPage() {
       formData.append("password", autoPassword);
       formData.append("language", autoLanguage);
       formData.append("registration type", "automated");
-      formData.append("cv path", cvPath);
-      formData.append("cv", cvFile, cvFile.name);
       await fetch(AUTO_REGISTER_URL, { method: "POST", body: formData });
     } catch (err) {
-      // Account is already created, so we don't block the user here.
-      console.error("CV analysis request failed:", err);
+      console.error("Automated registration request failed:", err);
     }
 
     setAutoSubmitting(false);
@@ -487,7 +414,17 @@ export default function LoginPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Which language do you prefer for your CV?</label>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Confirm Password</label>
+                    <PasswordField value={regConfirm} onChange={setRegConfirm} />
+                    {regConfirm && regPassword !== regConfirm && (
+                      <p className="mt-1 text-xs text-red-600">Passwords do not match</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Which language do you prefer for your CV?
+                    </label>
                     <LanguageSelect value={language} onChange={setLanguage} />
                   </div>
 
@@ -505,7 +442,7 @@ export default function LoginPage() {
 
                   <button
                     type="submit"
-                    disabled={!agree || submitting}
+                    disabled={!agree || submitting || regPassword !== regConfirm}
                     className="w-full py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition shadow-sm"
                   >
                     {submitting ? "Registering..." : "Register"}
@@ -545,87 +482,18 @@ export default function LoginPage() {
                     <PasswordField value={autoPassword} onChange={setAutoPassword} />
                   </div>
 
-                  {/* CV upload */}
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">CV Upload</label>
-                    <div
-                      onDragOver={onDragOver}
-                      onDragEnter={onDragOver}
-                      onDragLeave={onDragLeave}
-                      onDrop={onDrop}
-                      className={`flex flex-wrap items-center justify-center gap-3 px-4 py-6 rounded-xl border-2 border-dashed transition ${
-                        dragActive
-                          ? "border-indigo-400 bg-indigo-50"
-                          : cvError
-                          ? "border-red-300 bg-red-50/40"
-                          : "border-slate-300 bg-white"
-                      }`}
-                    >
-                      <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-                      </svg>
-                      <span className="text-sm text-slate-600">Drag &amp; drop your CV or</span>
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition"
-                      >
-                        Browse File
-                      </button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        onChange={onFileInputChange}
-                        className="hidden"
-                      />
-                    </div>
-                    <p className="mt-1.5 text-xs text-slate-400">
-                      PDF, DOC or DOCX, up to {MAX_FILE_MB} MB.
-                    </p>
-                    {cvError && <p className="mt-1 text-xs text-red-600">{cvError}</p>}
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Confirm Password</label>
+                    <PasswordField value={autoConfirm} onChange={setAutoConfirm} />
+                    {autoConfirm && autoPassword !== autoConfirm && (
+                      <p className="mt-1 text-xs text-red-600">Passwords do not match</p>
+                    )}
                   </div>
 
-                  {/* Uploaded file row */}
-                  {cvFile && (
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">Uploaded CV</label>
-                      <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-slate-100 border border-slate-200">
-                        <svg className="w-5 h-5 shrink-0 text-slate-500" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                        </svg>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm text-slate-800 truncate">{cvFile.name}</p>
-                          <p className="text-xs text-slate-400">{formatSize(cvFile.size)}</p>
-                        </div>
-                        <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 whitespace-nowrap">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
-                          Ready to upload
-                        </span>
-                        {!autoSubmitting && (
-                          <button
-                            type="button"
-                            onClick={removeFile}
-                            aria-label="Remove CV"
-                            className="text-slate-400 hover:text-slate-600"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Your CV will be analyzed to extract your skills, experience, education and career preferences for automated job matching.
-                  </p>
-
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Which language do you prefer for your CV?</label>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Which language do you prefer for your CV?
+                    </label>
                     <LanguageSelect value={autoLanguage} onChange={setAutoLanguage} />
                   </div>
 
@@ -643,7 +511,7 @@ export default function LoginPage() {
 
                   <button
                     type="submit"
-                    disabled={!autoAgree || !cvFile || autoSubmitting}
+                    disabled={!autoAgree || autoSubmitting || autoPassword !== autoConfirm}
                     className="w-full py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition shadow-sm"
                   >
                     {autoSubmitting ? "Creating account..." : "Create Automated Account"}
